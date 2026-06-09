@@ -1,12 +1,15 @@
-#Enums
+import copy
+
+# Enums
 from clases.enums.estado_de_malla import EstadoDeMalla
 from clases.enums.modalidad import Modalidad
 
-#Interfaz
+# Interfaces
 from clases.interfaces.i_unidad_evaluable import IUnidadEvaluable
+from clases.interfaces.i_clonable import IClonable
 
 
-class MallaCurricular:
+class MallaCurricular(IClonable):
     def __init__(self, codigo_de_malla: str, nombre: str, area_de_conocimiento: str, duracion_semanas: int, version_de_malla: str, modalidad: Modalidad):
         self.codigo_de_malla = codigo_de_malla
         self.nombre = nombre
@@ -17,7 +20,15 @@ class MallaCurricular:
         self._estado = EstadoDeMalla.DISENO
         self._total_horas_nivelacion = 0.0
         self._unidades_curriculares = [] #Lista unidades curriculares
-        
+
+
+    def clonar(self, nuevo_codigo_de_malla: str, nueva_version_de_malla: str):
+        malla_curricular_clonada = copy.deepcopy(self)
+        malla_curricular_clonada.codigo_de_malla = nuevo_codigo_de_malla
+        malla_curricular_clonada.version_de_malla = nueva_version_de_malla
+        malla_curricular_clonada._estado = EstadoDeMalla.DISENO
+        return malla_curricular_clonada
+
 
     def agregar_unidad_curricular(self, *args): #Sobrecarga
         unidad_agregada = True
