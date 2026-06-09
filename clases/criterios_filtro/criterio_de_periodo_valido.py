@@ -1,4 +1,4 @@
-from interfaces.i_criterio_filtro import ICriterioFiltro
+from clases.interfaces.i_criterio_filtro import ICriterioFiltro
 
 
 class CriterioPeriodoValido(ICriterioFiltro):
