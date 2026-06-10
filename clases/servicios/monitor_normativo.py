@@ -1,7 +1,7 @@
 from datetime import date
 
 #Enum
-from enums.estado_de_alerta import EstadoDeAlerta
+from clases.enums.estado_de_alerta import EstadoDeAlerta
 
 from clases.periodo_de_nivelacion import PeriodoDeNivelacion
 

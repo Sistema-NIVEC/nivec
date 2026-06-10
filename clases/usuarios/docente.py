@@ -38,6 +38,21 @@ class Docente(UsuarioAcademico, IAsignableAHorario):
         self._especialidades = [] #Áreas de conocimiento
         self._disponibilidad_semanal = [] #Bloque horario
         
+    @property
+    def nombres(self):
+        return self._nombres
+
+    @nombres.setter
+    def nombres(self, valor: str):
+        self._nombres = valor
+
+    @property
+    def apellidos(self):
+        return self._apellidos
+
+    @apellidos.setter
+    def apellidos(self, valor: str):
+        self._apellidos = valor
         
     def iniciar_sesion(self): #Sobreescritura
         if self._estado_de_vinculacion.value == "Inactivo":

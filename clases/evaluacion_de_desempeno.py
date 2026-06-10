@@ -1,7 +1,7 @@
 #Usuario
 from clases.usuarios.docente import Docente
 
-from interfaces.i_estrategia_de_evaluacion import IEstrategiaDeEvaluacion
+from clases.interfaces.i_estrategia_de_evaluacion import IEstrategiaDeEvaluacion
 
 
 class EvaluacionDeDesempeno:

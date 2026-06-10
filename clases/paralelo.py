@@ -10,12 +10,13 @@ from clases.horario import Horario
 
 
 class Paralelo:
-    def __init__(self, codigo_de_paralelo: str, nombre: str, jornada: Jornada, modalidad: Modalidad, capacidad_maxima: int):
+    def __init__(self, codigo_de_paralelo: str, nombre: str, jornada: Jornada, modalidad: Modalidad, capacidad_maxima: int, carrera):
         self.codigo_de_paralelo = codigo_de_paralelo
         self.nombre = nombre
         self.jornada = jornada #Instancia
         self.modalidad = modalidad #Instancia
         self.capacidad_maxima = capacidad_maxima
+        self.carrera = carrera
         self._docente_responsable = None #Instancia Docente
         self._estudiantes_matriculados = [] #Lista de instancias Estudiante
         self.horarios = []
