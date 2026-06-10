@@ -20,7 +20,7 @@ class DistribuidorDeEstudiantes:
     def _encontrar_mejor_paralelo(self, estudiante):
         paralelos_compatibles = []
         for paralelo in self.paralelos:
-            es_compatible = (paralelo.jornada == estudiante.jornada and paralelo.carrera == estudiante.carrera)
+            es_compatible = (paralelo.jornada == estudiante.jornada and paralelo.carrera == estudiante.carrera_registrada)
             if es_compatible and paralelo.tiene_cupo_disponible():
                 paralelos_compatibles.append(paralelo)
 

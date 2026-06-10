@@ -419,10 +419,8 @@ resultado("Docente 1 disponible para horario conflictivo", docente_1.verificar_d
 resultado("Docente 1 disponible para horario martes",     docente_1.verificar_disponibilidad_horaria(horario_martes))
 
 sub("Paralelos")
-paralelo_mat = Paralelo("PAR-A", "Paralelo A", Jornada.MATUTINA, Modalidad.PRESENCIAL, capacidad_maxima=3)
-paralelo_ves = Paralelo("PAR-B", "Paralelo B", Jornada.VESPERTINA, Modalidad.PRESENCIAL, capacidad_maxima=2)
-paralelo_mat.carrera = carrera_sistemas
-paralelo_ves.carrera = carrera_sistemas
+paralelo_mat = Paralelo("PAR-A", "Paralelo A", Jornada.MATUTINA, Modalidad.PRESENCIAL, capacidad_maxima=3, carrera=carrera_sistemas)
+paralelo_ves = Paralelo("PAR-B", "Paralelo B", Jornada.VESPERTINA, Modalidad.PRESENCIAL, capacidad_maxima=2, carrera=carrera_sistemas)
 
 paralelo_mat.agregar_horario(horario_lunes)
 paralelo_mat.agregar_horario(horario_martes)
@@ -474,10 +472,8 @@ resultado("Matriz de horarios", periodo.generar_matriz_de_horarios([paralelo_mat
 seccion("7. DISTRIBUIDOR DE ESTUDIANTES")
 
 # Preparar estudiantes y paralelos frescos
-paralelo_dist_mat = Paralelo("PAR-DM", "Dist Mat", Jornada.MATUTINA,  Modalidad.PRESENCIAL, 2)
-paralelo_dist_ves = Paralelo("PAR-DV", "Dist Ves", Jornada.VESPERTINA, Modalidad.PRESENCIAL, 2)
-paralelo_dist_mat.carrera = carrera_sistemas
-paralelo_dist_ves.carrera = carrera_sistemas
+paralelo_dist_mat = Paralelo("PAR-DM", "Dist Mat", Jornada.MATUTINA,  Modalidad.PRESENCIAL, 2, carrera_sistemas)
+paralelo_dist_ves = Paralelo("PAR-DV", "Dist Ves", Jornada.VESPERTINA, Modalidad.PRESENCIAL, 2, carrera_sistemas)
 
 # est_1=MATUTINA, est_2=MATUTINA, est_4=MATUTINA, est_3=VESPERTINA(retirada pero válida para distribución)
 distribuidor = DistribuidorDeEstudiantes([paralelo_dist_mat, paralelo_dist_ves])
