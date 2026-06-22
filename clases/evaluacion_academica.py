@@ -84,7 +84,6 @@ class EvaluacionAcademica(ISujetoEvaluacion):
         print(f"[EvaluacionAcademica] El porcentaje de asistencia ha sido registrado: {porcentaje}%")
 
     def verificar_aprobacion(self):
-<<<<<<< Updated upstream
         #Determinación del estado final por criterios normativos en orden de prioridad. Actualiza _estado_de_aprobacion y retorna el estado resultante
         if self._estado_de_aprobacion in (EstadoDeAprobacion.RETIRADO, EstadoDeAprobacion.ANULADO):
             print(f"[Evaluación académica] Estado cerrado: {self._estado_de_aprobacion.value}")
@@ -95,13 +94,11 @@ class EvaluacionAcademica(ISujetoEvaluacion):
             self._observacion = "Reprobado por porcentaje de asistencia insuficiente."
             print(f"[Evaluación académica] {self._observacion}")
             return self._estado_de_aprobacion
-=======
         #Guardar el estado anterior
         estado_anterior = self._estado_de_aprobacion
 
         #Chain of Responsibility
         self._cadena_aprobacion.manejar(self)
->>>>>>> Stashed changes
 
         # Si el estado cambió (dejó de estar PENDIENTE), notificación al Observer
         if estado_anterior == EstadoDeAprobacion.PENDIENTE and self._estado_de_aprobacion != EstadoDeAprobacion.PENDIENTE:
