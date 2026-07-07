@@ -89,3 +89,99 @@ class UsuarioDeSistema(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.nombres} {self.apellidos} ({self.correo_institucional})"
+
+
+
+# ══════════════════════════════════════════════════════════════
+# PERFIL DOCENTE
+# ══════════════════════════════════════════════════════════════
+
+class PerfilDocente(models.Model):
+    usuario_de_sistema = models.OneToOneField(
+        UsuarioDeSistema, on_delete=models.CASCADE,
+        related_name="perfil_docente", verbose_name="Usuario de sistema registrado"
+    )
+    universidad = models.ForeignKey(
+        'academico.Universidad', on_delete=models.SET_NULL,
+        related_name="docentes", verbose_name="Universidad registrada",
+        null=True, blank=True
+    )
+    identificador_institucional = models.CharField(
+        max_length=50, unique=True, verbose_name="Número de identificador institucional"
+    )
+    tipo_de_vinculacion = models.CharField(
+        max_length=50,
+        choices=cambiar_enum_a_choices(TipoDeVinculacion),
+        verbose_name="Tipo de vinculación"
+    )
+    tiempo_de_dedicacion = models.CharField(
+        max_length=50,
+        choices=cambiar_enum_a_choices(TiempoDeDedicacion),
+        verbose_name="Tiempo de dedicación"
+    )
+    estado_de_vinculacion = models.CharField(
+        max_length=50,
+        choices=cambiar_enum_a_choices(EstadoDeVinculacion),
+        default=EstadoDeVinculacion.ACTIVO.value,
+        verbose_name="Estado de vinculación"
+    )
+    carga_horaria_maxima = models.FloatField(
+        default=20.0, verbose_name="Carga horaria máxima (en horas)"
+    )
+    jornadas = models.JSONField(default=list, verbose_name="Jornadas disponibles")
+
+    class Meta:
+        verbose_name = "Perfil docente"
+        verbose_name_plural = "Perfiles docentes"
+
+    def __str__(self):
+        return f"DOCENTE: {self.usuario_de_sistema.nombres} {self.usuario_de_sistema.apellidos}"
+
+
+# ══════════════════════════════════════════════════════════════
+# PERFIL ESTUDIANTE
+# ══════════════════════════════════════════════════════════════
+
+class PerfilEstudiante(models.Model):
+    usuario_de_sistema = models.OneToOneField(
+        UsuarioDeSistema, on_delete=models.CASCADE,
+        related_name="perfil_estudiante", verbose_name="Usuario de sistema registrado"
+    )
+    identificador_institucional = models.CharField(
+        max_length=50, unique=True, verbose_name="Número de identificador institucional"
+    )
+    numero_de_matricula = models.CharField(
+        max_length=50, unique=True, verbose_name="Número de matrícula"
+    )
+    jornada = models.CharField(
+        max_length=50, choices=cambiar_enum_a_choices(Jornada),
+        verbose_name="Jornada registrada"
+    )
+    registro_de_cupo = models.CharField(
+        max_length=50, choices=cambiar_enum_a_choices(RegistroDeCupo),
+        verbose_name="Registro de cupo"
+    )
+    carrera_registrada = models.ForeignKey(
+        'academico.Carrera', on_delete=models.PROTECT, related_name="estudiantes"
+    )
+    campus_registrado = models.ForeignKey(
+        'academico.Campus', on_delete=models.PROTECT, related_name="estudiantes"
+    )
+    estado_de_matricula = models.CharField(
+        max_length=50,
+        choices=cambiar_enum_a_choices(EstadoDeMatricula),
+        default=EstadoDeMatricula.MATRICULADO.value,
+        verbose_name="Estado de matrícula"
+    )
+    periodo_de_nivelacion = models.ForeignKey(
+        'academico.PeriodoDeNivelacion', on_delete=models.SET_NULL,
+        related_name="estudiantes_de_periodo",
+        null=True, blank=True, verbose_name="Periodo de nivelación"
+    )
+
+    class Meta:
+        verbose_name = "Perfil estudiante"
+        verbose_name_plural = "Perfiles estudiantes"
+
+    def __str__(self):
+        return f"ESTUDIANTE: {self.usuario_de_sistema.nombres} {self.usuario_de_sistema.apellidos}"
