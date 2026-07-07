@@ -1,0 +1,64 @@
+{% extends "base_listar.html" %}
+
+{% block filtros %}
+<form method="get" style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+    <span style="font-size: 13px; font-weight: bold; color: #253237; font-family: inherit;">Perfil</span>
+    <select name="perfil" onchange="this.form.submit()"
+            style="padding: 10px 14px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; font-weight: 500; font-family: inherit; min-width: 200px;">
+        <option value=""></option>
+        {% for p in perfiles_disponibles %}
+        <option value="{{ p }}" {% if perfil_filtro == p %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+    </select>
+    <input type="text" name="busqueda" value="{{ busqueda }}" placeholder="Apellidos y Nombres..."
+           oninput="this.form.submit()"
+           style="padding: 10px 14px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; min-width: 300px; font-weight: 500; font-family: inherit;">
+</form>
+{% endblock %}
+
+{% block cabeceras_tabla %}
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Número de identificación</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Apellidos y Nombres</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Correo institucional</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Número de identificador administrativo</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Perfil administrativo</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Estado de usuario</th>
+    {% if puede_modificar_administrativo or puede_eliminar_administrativo %}
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Acciones</th>
+    {% endif %}
+{% endblock %}
+
+{% block cuerpo_tabla %}
+    {% for admin in administrativos %}
+    <tr>
+        <td style="font-family: monospace; text-align: left;">{{ admin.usuario_de_sistema.identificacion }}</td>
+        <td style="text-align: left;">{{ admin.usuario_de_sistema.apellidos }} {{ admin.usuario_de_sistema.nombres }}</td>
+        <td style="text-align: left;">{{ admin.usuario_de_sistema.correo_institucional }}</td>
+        <td style="font-family: monospace; text-align: left;">{{ admin.identificador_administrativo }}</td>
+        <td style="text-align: left;">{{ admin.perfil_administrativo }}</td>
+        <td style="text-align: left;"><span style="font-weight: bold; color: #253237; font-size: 13px;">{{ admin.usuario_de_sistema.estado_de_usuario }}</span></td>
+        {% if puede_modificar_administrativo or puede_eliminar_administrativo %}
+        <td style="text-align: left;">
+            {% if admin.perfil_administrativo != "Director de dirección de admisión y nivelación" %}
+                {% if puede_modificar_administrativo %}
+                <a href="{% url 'modificar_administrativo' admin.id %}" class="etiqueta-accion etiqueta-modificar">Modificar</a>
+                {% endif %}
+                {% if puede_eliminar_administrativo %}
+                <a href="{% url 'eliminar_administrativo' admin.id %}" 
+                   onclick="return confirm('Confirmar acción');"
+                   class="etiqueta-accion etiqueta-eliminar">Eliminar</a>
+                {% endif %}
+            {% endif %}
+        </td>
+        {% endif %}
+    </tr>
+    {% empty %}
+    {% if not busqueda and not perfil_filtro %}
+    <tr>
+        <td colspan="{% if puede_modificar_administrativo or puede_eliminar_administrativo %}7{% else %}6{% endif %}" style="text-align: center; color: #9db4c0; padding: 30px;">
+            No existen registros actualmente
+        </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+{% endblock %}
