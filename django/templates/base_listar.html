@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ titulo_pagina|default:"NIVEC" }}{% endblock %}
+
+{% block contenido %}
+<style>
+    .tarjeta table th, .tarjeta table td {
+        padding: 12px 24px; 
+        white-space: nowrap; /* Evita que el texto se aplaste hacia abajo */
+    }
+    
+    .etiqueta-accion {
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-size: 12px;
+        text-decoration: none;
+        display: inline-block;
+        font-weight: bold;
+        transition: all 0.2s ease;
+        border: none;
+        cursor: pointer;
+    }
+    
+    /* Acción ligera (izquierda, más clara) */
+    .etiqueta-naranja {
+        background: #9db4c0;
+        color: white;
+        margin-right: 8px;
+    }
+    
+    .etiqueta-naranja:hover {
+        opacity: 0.85;
+    }
+    
+    /* Acción media (centro) */
+    .etiqueta-modificar {
+        background: #5c6b73;
+        color: white;
+        margin-right: 8px;
+    }
+    
+    .etiqueta-modificar:hover {
+        opacity: 0.85;
+    }
+    
+    /* Acción fuerte (derecha, más oscura) */
+    .etiqueta-eliminar {
+        background: #253237;
+        color: white;
+    }
+    
+    .etiqueta-eliminar:hover {
+        opacity: 0.85;
+    }
+
+    /* Spacing between action buttons */
+    .etiqueta-accion {
+        margin-right: 6px;
+    }
+    .etiqueta-accion:last-child {
+        margin-right: 0;
+    }
+</style>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 4px; color: #253237;">{{ titulo }}</h2>
+
+    {% block boton_registrar %}
+    {% if url_registrar and not solo_lectura %}
+    <a href="{% url url_registrar %}" class="boton boton-primario">{{ texto_registrar|default:"Registrar" }}</a>
+    {% endif %}
+    {% endblock %}
+</div>
+
+{% block filtros %}{% endblock %}
+
+<div class="tarjeta" style="padding: 0; overflow-x: auto;">
+    <table style="width: 100%;">
+        <thead>
+            <tr>
+                {% block cabeceras_tabla %}{% endblock %}
+            </tr>
+        </thead>
+        <tbody>
+            {% block cuerpo_tabla %}{% endblock %}
+        </tbody>
+    </table>
+</div>
+
+<div style="margin-top: 15px;">
+    <a href="{% if url_volver %}{% url url_volver %}{% else %}#{% endif %}" class="boton boton-secundario">Volver</a>
+</div>
+{% endblock %}
