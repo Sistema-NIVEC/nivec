@@ -8,7 +8,7 @@ from poo.clases.usuarios.estudiante import Estudiante
 from poo.clases.unidad_curricular import UnidadCurricular
 
 #Interfaces y Servicios (Patrones de Diseño)
-from poo.clases.interfaces.i_sujeto_evaluacion import ISujetoEvaluacion
+from poo.clases.interfaces.i_sujeto_de_evaluacion import ISujetoEvaluacion
 from poo.clases.servicios.manejadores_de_aprobacion import ManejadorEstadoInactivo, ManejadorAsistencia, ManejadorCalificacion
 
 
