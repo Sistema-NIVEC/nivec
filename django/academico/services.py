@@ -200,6 +200,128 @@ def servicio_carrera_registrar_masivo_desde_excel(archivo, universidad_usuario):
         
     return resultado
 
+
+
+
+
+# ══════════════════════════════════════════════════════════════
+# PERIODOS DE NIVELACIÓN
+# ══════════════════════════════════════════════════════════════
+
+def _construir_periodo(periodo_db):
+    return PeriodoDeNivelacionBase(
+        codigo_periodo=periodo_db.codigo_periodo,
+        anio=periodo_db.anio,
+        periodo=periodo_db.periodo,
+        fecha_inicio=periodo_db.fecha_inicio,
+        fecha_fin=periodo_db.fecha_fin,
+        numero_periodo=periodo_db.numero_periodo,
+        estado=obtener_enum_flexible(EstadoDePeriodo, periodo_db.estado)
+    )
+
+def servicio_iniciar_periodo_de_nivelacion(periodo_db):
+    from poo.clases.servicios.centro_de_operacion_academica import CentroDeOperacionAcademica
+    from academico.models import Paralelo, MatriculaParalelo
+    from academico.services import _horas_sincronicas_semanales, servicio_horas_agendadas_paralelo
+
+    if periodo_db.estado != EstadoDePeriodo.PLANIFICACION.value:
+        return (False, "El Periodo de nivelación no se encuentra en planificación")
+
+    periodos_en_curso = PeriodoDeNivelacion.objects.filter(
+        universidad=periodo_db.universidad,
+        estado=EstadoDePeriodo.EN_CURSO.value
+    ).exclude(pk=periodo_db.pk)
+    if periodos_en_curso.exists():
+        return (False, "Ya existe un Periodo de nivelación en curso")
+
+    paralelos = Paralelo.objects.filter(periodo_de_nivelacion=periodo_db)
+    if not paralelos.exists():
+        return (False, "No existen Paralelos creados para este Periodo")
+
+    sin_docente = paralelos.filter(docente_responsable__isnull=True)
+    if sin_docente.exists():
+        return (False, "Todos los Paralelos deben tener un Docente designado para iniciar el Periodo")
+
+    for paralelo in paralelos:
+        agendadas = servicio_horas_agendadas_paralelo(paralelo)
+        requeridas = _horas_sincronicas_semanales(paralelo.unidad_curricular, periodo_db)
+        if agendadas < requeridas:
+            return (False, f"El Paralelo {paralelo.nombre} ({paralelo.unidad_curricular.nombre}) no tiene el Horario completo")
+
+    tiene_estudiantes = MatriculaParalelo.objects.filter(
+        paralelo__periodo_de_nivelacion=periodo_db
+    ).exists()
+    if not tiene_estudiantes:
+        return (False, "No existen Estudiantes matriculados en los Paralelos")
+
+    periodo_poo = _construir_periodo(periodo_db)
+    facade = CentroDeOperacionAcademica()
+    if facade.iniciar_periodo(periodo_poo):
+        periodo_db.estado = periodo_poo.estado.value
+        periodo_db.save()
+        return (True, f"El Periodo de nivelación {periodo_db.periodo} ha iniciado")
+
+    return (False, "No se ha podido iniciar el Periodo de nivelación")
+
+def servicio_pasar_a_evaluacion(periodo_db):
+    if periodo_db.estado != EstadoDePeriodo.EN_CURSO.value:
+        return (False, "El Periodo de nivelación no se encuentra en curso")
+    
+    from academico.models import Paralelo, Horario, MatriculaParalelo
+    from academico.services import _horas_sincronicas_semanales, servicio_horas_agendadas_paralelo
+    
+    paralelos = Paralelo.objects.filter(periodo_de_nivelacion=periodo_db)
+    if not paralelos.exists():
+        return (False, "No existen Paralelos creados para este Periodo")
+    
+    sin_docente = paralelos.filter(docente_responsable__isnull=True)
+    if sin_docente.exists():
+        return (False, "Todos los Paralelos deben tener un Docente designado para pasar a evaluación")
+    
+    for paralelo in paralelos:
+        agendadas = servicio_horas_agendadas_paralelo(paralelo)
+        requeridas = _horas_sincronicas_semanales(paralelo.unidad_curricular, periodo_db)
+        if agendadas < requeridas:
+            return (False, f"El Paralelo {paralelo.nombre} ({paralelo.unidad_curricular.nombre}) no tiene el Horario completo")
+    
+    tiene_estudiantes = MatriculaParalelo.objects.filter(
+        paralelo__periodo_de_nivelacion=periodo_db
+    ).exists()
+    if not tiene_estudiantes:
+        return (False, "No existen Estudiantes matriculados en los Paralelos")
+    
+    periodo_db.estado = EstadoDePeriodo.EVALUACION.value
+    periodo_db.save()
+    return (True, "El Periodo de nivelación ha pasado a evaluación")
+
+
+def servicio_finalizar_periodo_de_nivelacion(periodo_db):
+    if periodo_db.estado != EstadoDePeriodo.EVALUACION.value:
+        return (False, "El Periodo de nivelación debe estar en evaluación para poder finalizarlo")
+    
+    from academico.models import Carrera
+    carreras = Carrera.objects.filter(campus__universidad=periodo_db.universidad)
+    
+    alguna_carrera_formalizada = False
+    for carrera in carreras:
+        evaluaciones_carrera = EvaluacionAcademica.objects.filter(
+            periodo_de_nivelacion=periodo_db,
+            estudiante__carrera_registrada=carrera,
+        )
+        if evaluaciones_carrera.exists() and not evaluaciones_carrera.exclude(estado_revision="Formalizado").exists():
+            alguna_carrera_formalizada = True
+            break
+    
+    if not alguna_carrera_formalizada:
+        return (False, "Al menos una Carrera debe tener todas sus calificaciones formalizadas para finalizar el Periodo")
+    
+    periodo_db.estado = EstadoDePeriodo.CERRADO.value
+    periodo_db.save()
+    return (True, "El Periodo de nivelación ha finalizado")
+
+
+
+
 # ══════════════════════════════════════════════════════════════
 # CARGA MASIVA: MALLAS CURRICULARES
 # ══════════════════════════════════════════════════════════════
@@ -431,6 +553,357 @@ def servicio_unidad_registrar_masivo_desde_excel(archivo, universidad_usuario):
         resultado["error"] = "Ha ocurrido un error al procesar el documento"
 
     return resultado
+
+
+
+
+
+def servicio_registrar_evaluacion_academica(evaluacion_academica: EvaluacionAcademica):
+    from poo.clases.unidad_curricular import UnidadCurricular as UnidadCurricularBase
+    from usuarios.services import _construir_estudiante
+
+    unidad_curricular_base = UnidadCurricularBase(
+        codigo_de_unidad = evaluacion_academica.unidad_curricular.codigo_de_unidad,
+        nombre = evaluacion_academica.unidad_curricular.nombre,
+        horas_totales = evaluacion_academica.unidad_curricular.horas_totales,
+        horas_sincronicas = evaluacion_academica.unidad_curricular.horas_sincronicas,
+        horas_asincronicas = evaluacion_academica.unidad_curricular.horas_asincronicas,
+        criterio_de_aprobacion = evaluacion_academica.unidad_curricular.criterio_de_aprobacion,
+        porcentaje_minimo_asistencia = evaluacion_academica.unidad_curricular.porcentaje_minimo_asistencia
+    )
+    estudiante = _construir_estudiante(evaluacion_academica.estudiante)
+    evaluacion = EvaluacionAcademicaPOO(estudiante = estudiante, unidad_curricular = unidad_curricular_base)
+    
+    evaluacion.registrar_calificacion(1, evaluacion_academica.calificacion_parcial_1)
+    evaluacion.registrar_calificacion(2, evaluacion_academica.calificacion_parcial_2)
+    evaluacion.registrar_asistencia_final(evaluacion_academica.porcentaje_asistencia)
+    nota_final = evaluacion.calcular_nota_final()
+    estado = evaluacion.verificar_aprobacion()
+
+    evaluacion_academica.nota_final = nota_final
+    evaluacion_academica.estado_de_aprobacion = estado.value
+    evaluacion_academica.observacion = evaluacion._observacion
+    evaluacion_academica.save()
+
+
+def servicio_procesar_mtn(archivo, periodo_de_nivelacion: PeriodoDeNivelacion):
+    from usuarios.services import servicio_estudiante_registrar_masivo_desde_excel
+    from poo.clases.consolidado_academico import ConsolidadoAcademico as ConsolidadoAcademicoPOO
+
+    resultado = servicio_estudiante_registrar_masivo_desde_excel(
+        archivo, periodo_de_nivelacion.universidad, periodo_de_nivelacion=periodo_de_nivelacion
+    )
+
+
+    if resultado.get("error"):
+        return resultado
+
+    # Conteo dinámico: el consolidado refleja el estado real del periodo (cuenta de
+    # estudiantes anclados), no acumula por carga. Así, re-cargar la misma MTN no
+    # infla ni descuadra los totales.
+    identificaciones = list(
+        PerfilEstudiante.objects.filter(
+            periodo_de_nivelacion=periodo_de_nivelacion
+        ).values_list("usuario_de_sistema__identificacion", flat=True)
+    )
+    participantes = len(identificaciones)
+    observados = resultado["observados"]
+
+    matriz_procesada = (
+        [{"identificacion": ident} for ident in identificaciones]
+        + [{} for _ in range(observados)]
+    )
+
+    consolidado_poo = ConsolidadoAcademicoPOO(
+        periodo_academico=None,
+        fecha_de_corte=date.today(),
+        total_de_cupos_aceptados=participantes,
+    )
+    consolidado_poo.cargar_matriz_de_cupos(matriz_procesada, participantes, observados)
+    estadisticas = consolidado_poo.obtener_estadisticas_de_consolidado()
+
+    consolidado_db, _ = ConsolidadoAcademico.objects.get_or_create(
+        periodo_academico=periodo_de_nivelacion,
+        defaults={"fecha_de_corte": date.today()},
+    )
+    consolidado_db.registros_validos = estadisticas["Registros válidos"]
+    consolidado_db.total_cupos_aceptados = estadisticas["Cupos aceptados esperados"]
+    consolidado_db.registros_observados = observados
+    consolidado_db.registros_totales = participantes + observados
+    consolidado_db.fecha_de_corte = date.today()
+    consolidado_db.save()
+
+    return resultado
+
+
+
+
+def servicio_exportar_informe(informe_general: InformeGeneral, formato: str):
+    evaluaciones = EvaluacionAcademica.objects.filter(
+        unidad_curricular__malla_curricular__carrera__campus__universidad=informe_general.periodo_academico.universidad
+    ).select_related("estudiante", "unidad_curricular")
+
+    if formato == "excel":
+        return _exportar_excel(informe_general, evaluaciones)
+    return _exportar_txt(informe_general, evaluaciones)
+
+
+def _exportar_excel(informe_django, evaluaciones):
+    libro = openpyxl.Workbook()
+    hoja = libro.active
+    hoja.title = f"Informe {informe_django.periodo_academico.periodo}"
+    hoja.append(["Identificación", "Nombres", "Apellidos", "Carrera registrada", "Campus registrado",
+                 "Jornada", "Unidad curricular", "Calificación primer parcial", "Calificación segundo parcial",
+                 "Calificacion final", "Porcentaje de asistencia final", "Estado"])
+    for evaluacion in evaluaciones:
+        evaluacion_estudiante = evaluacion.estudiante
+        hoja.append([
+            evaluacion_estudiante.usuario_de_sistema.identificacion,
+            evaluacion_estudiante.usuario_de_sistema.nombres,
+            evaluacion_estudiante.usuario_de_sistema.apellidos,
+            evaluacion_estudiante.carrera_registrada.nombre,
+            evaluacion_estudiante.campus_registrado.nombre,
+            evaluacion_estudiante.jornada,
+            evaluacion.unidad_curricular.nombre,
+            evaluacion.calificacion_parcial_1,
+            evaluacion.calificacion_parcial_2,
+            evaluacion.nota_final,
+            evaluacion.porcentaje_asistencia,
+            evaluacion.estado_de_aprobacion,
+        ])
+    documento = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    documento["Content-Disposition"] = f'attachment; filename="informe_{informe_django.periodo_academico.periodo}.xlsx"'
+    libro.save(documento)
+    return documento
+
+
+def _exportar_txt(informe_django, evaluaciones):
+    lineas = [
+        "INFORME GENERAL DE PERIODO DE NIVELACIÓN",
+        f"Periodo de nivelación: {informe_django.periodo_academico.periodo}",
+        f"Universidad: {informe_django.periodo_academico.universidad.nombre}",
+        f"Fecha de emisión: {date.today()}",
+        "─" * 60,
+    ]
+    for evaluacion in evaluaciones:
+        evaluacion_estudiante = evaluacion.estudiante
+        lineas.append(
+            f"{evaluacion_estudiante.usuario_de_sistema.identificacion:<15} "
+            f"{evaluacion_estudiante.usuario_de_sistema.nombres:<25} "
+            f"{evaluacion.unidad_curricular.nombre:<30} "
+            f"{evaluacion.nota_final:>6.2f} "
+            f"{evaluacion.estado_de_aprobacion:<12}"
+        )
+    documento = HttpResponse("\n".join(lineas), content_type="text/plain; charset=utf-8")
+    documento["Content-Disposition"] = f'attachment; filename="informe_{informe_django.periodo_academico.periodo}.txt"'
+    return documento
+
+
+
+
+# ══════════════════════════════════════════════════════════════
+# GESTIÓN DE MALLAS CURRICULARES
+# ══════════════════════════════════════════════════════════════
+
+def _construir_unidad_poo(unidad_db):
+    from poo.clases.unidad_curricular import UnidadCurricular as UnidadCurricularBase
+
+    return UnidadCurricularBase(
+        codigo_de_unidad=unidad_db.codigo_de_unidad,
+        nombre=unidad_db.nombre,
+        horas_totales=unidad_db.horas_totales,
+        horas_sincronicas=unidad_db.horas_sincronicas,
+        horas_asincronicas=unidad_db.horas_asincronicas,
+        criterio_de_aprobacion=unidad_db.criterio_de_aprobacion,
+        porcentaje_minimo_asistencia=unidad_db.porcentaje_minimo_asistencia,
+    )
+    
+def servicio_generar_version_malla(carrera):
+    import re
+    maximo = 0
+    for version in MallaCurricular.objects.filter(carrera=carrera).values_list("version_de_malla", flat=True):
+        coincidencia = re.search(r"\d+", str(version or ""))
+        if coincidencia:
+            maximo = max(maximo, int(coincidencia.group()))
+    return f"V{maximo + 1}"
+    
+def _construir_malla_poo(malla_db, cargar_unidades=False):
+    from poo.clases.malla_curricular import MallaCurricular as MallaCurricularBase
+
+    malla_poo = MallaCurricularBase(
+        codigo_de_malla=malla_db.codigo_de_malla,
+        nombre=malla_db.nombre,
+        version_de_malla=malla_db.version_de_malla,
+    )
+
+    if cargar_unidades:
+        for unidad_db in malla_db.unidades_curriculares.all():
+            malla_poo.agregar_unidad_curricular(_construir_unidad_poo(unidad_db))
+
+    malla_poo.establecer_estado(obtener_enum_flexible(EstadoDeMalla, malla_db.estado))
+    return malla_poo
+
+def servicio_recalcular_total_horas_malla(malla_db):
+    malla_poo = _construir_malla_poo(malla_db, cargar_unidades=False)
+    malla_poo.establecer_estado(EstadoDeMalla.DISENO)
+
+    for unidad_db in malla_db.unidades_curriculares.all():
+        malla_poo.agregar_unidad_curricular(_construir_unidad_poo(unidad_db))
+
+    malla_db.total_horas_nivelacion = malla_poo.calcular_total_horas_nivelacion()
+    malla_db.save(update_fields=["total_horas_nivelacion"])
+    return malla_db.total_horas_nivelacion
+
+def servicio_cambiar_estado_malla(malla_db, accion):
+    malla_poo = _construir_malla_poo(malla_db)
+
+    if accion == "activar":
+        # Validar que la malla no exceda el límite de horas sincrónicas semanales (20h)
+        from poo.clases.franja_horaria import validar_malla_cabe_en_horario, SEMANAS_REFERENCIA_MINIMA
+        from django.db.models import Sum
+
+        total_sincronicas = malla_db.unidades_curriculares.aggregate(
+            total=Sum("horas_sincronicas")
+        )["total"] or 0.0
+
+        validacion = validar_malla_cabe_en_horario(total_sincronicas, SEMANAS_REFERENCIA_MINIMA)
+        if not validacion["ok"]:
+            return (
+                False,
+                f"La Malla curricular no se ha podido habilitar. "
+                f"Requiere {validacion['horas_semanales']}h sincrónicas semanales "
+                f"y el máximo permitido es {validacion['limite']}h "
+                f"(con {SEMANAS_REFERENCIA_MINIMA} semanas de periodo)"
+            )
+
+        otra_activa = MallaCurricular.objects.filter(
+            carrera=malla_db.carrera,
+            estado=EstadoDeMalla.ACTIVA.value,
+        ).exclude(pk=malla_db.pk).first()
+
+        if otra_activa:
+            return (
+                False,
+                f"La Carrera tiene una Malla curricular activa ({otra_activa.codigo_de_malla} - {otra_activa.version_de_malla})"
+            )
+
+        if not malla_poo.activar():
+            return (False, "La Malla curricular no se ha podido habilitar")
+
+    elif accion == "historica":
+        if not malla_poo.marcar_historica():
+            return (False, "La Malla curricular no se ha podido descontinuar")
+
+    elif accion == "inactivar":
+        if not malla_poo.inactivar():
+            return (False, "La Malla curricular no se ha podido deshabilitar")
+
+    else:
+        return (False, "No válido")
+
+    malla_db.estado = malla_poo.estado.value
+    malla_db.save(update_fields=["estado"])
+    return (True, "El estado de la Malla curricular ha sido actualizado correctamente")
+
+def servicio_clonar_malla_curricular(id_malla_curricular_bd, nuevo_nombre=None):
+    from academico.models import UnidadCurricular
+
+    malla_curricular_db = MallaCurricular.objects.get(id=id_malla_curricular_bd)
+
+    malla_poo = _construir_malla_poo(malla_curricular_db, cargar_unidades=True)
+
+    nuevo_codigo = generar_identificador_siguiente(MallaCurricular, "MC", "codigo_de_malla")
+    nueva_version = servicio_generar_version_malla(malla_curricular_db.carrera)
+    clon_poo = malla_poo.clonar(nuevo_codigo, nueva_version)
+
+    if nuevo_nombre and str(nuevo_nombre).strip():
+        clon_poo.nombre = str(nuevo_nombre).strip()
+
+    with transaction.atomic():
+        nueva_malla_curricular_db = MallaCurricular.objects.create(
+            carrera=malla_curricular_db.carrera,
+            codigo_de_malla=clon_poo.codigo_de_malla,
+            nombre=clon_poo.nombre,
+            version_de_malla=clon_poo.version_de_malla,
+            estado=clon_poo.estado.value,  # Diseño
+            total_horas_nivelacion=clon_poo.total_horas_nivelacion,
+        )
+
+        for unidad_poo in clon_poo.obtener_unidades_curriculares():
+            UnidadCurricular.objects.create(
+                malla_curricular=nueva_malla_curricular_db,
+                codigo_de_unidad=generar_identificador_siguiente(
+                    UnidadCurricular, "UC", "codigo_de_unidad"
+                ),
+                nombre=unidad_poo.nombre,
+                horas_totales=unidad_poo.horas_totales,
+                horas_sincronicas=unidad_poo.horas_sincronicas,
+                horas_asincronicas=unidad_poo.horas_asincronicas,
+                criterio_de_aprobacion=unidad_poo.criterio_de_aprobacion,
+                porcentaje_minimo_asistencia=unidad_poo.porcentaje_minimo_asistencia,
+            )
+
+    return nueva_malla_curricular_db
+
+
+def _obtener_o_crear_cohorte(periodo_db, carrera):
+    from poo.clases.enums.tipo_de_cohorte import TipoDeCohorte
+
+    cohorte = CohorteDeMatricula.objects.filter(
+        periodo_de_nivelacion=periodo_db, carrera_registrada=carrera
+    ).first()
+    if cohorte:
+        return cohorte
+
+    return CohorteDeMatricula.objects.create(
+        periodo_de_nivelacion=periodo_db,
+        carrera_registrada=carrera,
+        codigo_de_registro=generar_identificador_siguiente(CohorteDeMatricula, "COH", "codigo_de_registro"),
+        nombre_cohorte=f"Cohorte {carrera.nombre} - {periodo_db.periodo}",
+        fecha_de_cierre=periodo_db.fecha_fin,
+        tipo_de_cohorte=TipoDeCohorte.PRIMERA_MATRICULA.value,
+    )
+def servicio_recalcular_cohorte_de_carrera(periodo_db, carrera):
+    # Recalcula los totales de la cohorte (por tipo de cupo) desde los estudiantes
+    # realmente matriculados. La lógica de conteo vive en la POO CohorteDeMatricula.
+    from poo.clases.cohorte_de_matricula import CohorteDeMatricula as CohorteDeMatriculaPOO
+    from poo.clases.enums.tipo_de_cohorte import TipoDeCohorte
+
+    cohorte = CohorteDeMatricula.objects.filter(
+        periodo_de_nivelacion=periodo_db, carrera_registrada=carrera
+    ).first()
+    if not cohorte:
+        return
+
+    estudiantes = PerfilEstudiante.objects.filter(
+        periodo_de_nivelacion=periodo_db,
+        carrera_registrada=carrera,
+        estudiantes_matriculados__paralelo__periodo_de_nivelacion=periodo_db,
+    ).distinct()
+
+    cohorte_poo = CohorteDeMatriculaPOO(
+        codigo_de_registro=cohorte.codigo_de_registro,
+        nombre_cohorte=cohorte.nombre_cohorte,
+        carrera_registrada=None,
+        fecha_de_cierre=periodo_db.fecha_fin,
+        periodo_de_nivelacion=None,
+        tipo_de_cohorte=obtener_enum_flexible(TipoDeCohorte, cohorte.tipo_de_cohorte),
+    )
+    for estudiante_db in estudiantes:
+        cohorte_poo.registrar_estudiante_matriculado(estudiante_db)
+
+    estadisticas = cohorte_poo.obtener_estadisticas_de_registro()
+    cohorte.total_primera_matricula = estadisticas["Total primera matricula"]
+    cohorte.total_segunda_matricula = estadisticas["Total segunda matricula"]
+    cohorte.total_exonerados = estadisticas["Total exonerados"]
+    cohorte.save()
+
+
+def _nombre_paralelo_letra(indice):
+    """Delega al método estático de la clase POO Paralelo."""
+    from poo.clases.paralelo import Paralelo as ParaleloBase
+    return ParaleloBase.generar_nombre_por_indice(indice)
+
 
 def servicio_generar_paralelos(periodo_db, capacidad=35):
     import math
@@ -781,6 +1254,9 @@ def servicio_agregar_estudiante_a_paralelo(estudiante_db, paralelo_db):
 
     servicio_recalcular_cohorte_de_carrera(periodo, carrera)
     return (True, "El Estudiante fue agregado al Paralelo correctamente")
+
+
+
 
 # ══════════════════════════════════════════════════════════════
 # HORARIOS
@@ -1348,3 +1824,77 @@ def servicio_cargar_calificaciones_desde_excel(archivo, paralelo_db, unidad_curr
             resultado["advertencias"].append(f"Fila {numero_fila} omitida ({str(e)})")
 
     return resultado
+
+
+
+
+
+# ══════════════════════════════════════════════════════════════
+# FLUJO DE REVISIÓN DE CALIFICACIONES
+# ══════════════════════════════════════════════════════════════
+def servicio_pasar_a_revision(paralelo_db):
+    """Pasa todas las evaluaciones de un paralelo+unidad de Borrador a En revisión."""
+    count = EvaluacionAcademica.objects.filter(
+        unidad_curricular=paralelo_db.unidad_curricular,
+        periodo_de_nivelacion=paralelo_db.periodo_de_nivelacion,
+        estado_revision="Borrador",
+        estudiante__estudiantes_matriculados__paralelo=paralelo_db,
+    ).update(estado_revision="En revisión")
+    return count
+
+
+def servicio_formalizar_evaluaciones(paralelo_db):
+    """Pasa todas las evaluaciones de un paralelo+unidad (Borrador o En revisión) a Formalizado."""
+    count = EvaluacionAcademica.objects.filter(
+        unidad_curricular=paralelo_db.unidad_curricular,
+        periodo_de_nivelacion=paralelo_db.periodo_de_nivelacion,
+        estado_revision__in=["Borrador", "En revisión"],
+        estudiante__estudiantes_matriculados__paralelo=paralelo_db,
+    ).update(estado_revision="Formalizado")
+    return count
+
+
+
+def servicio_generar_informe_general(periodo_db):
+    """
+    Genera estadísticas del periodo: por carrera, cuántos aprobados, reprobados, retirados, anulados.
+    Solo disponible si el periodo está en Evaluación o Cerrado.
+    """
+    from academico.models import EvaluacionAcademica, Carrera, Paralelo
+    from django.db.models import Count, Q
+
+    if periodo_db.estado not in (EstadoDePeriodo.EVALUACION.value, EstadoDePeriodo.CERRADO.value):
+        return None
+
+    carreras = Carrera.objects.filter(campus__universidad=periodo_db.universidad)
+    informe = []
+
+    for carrera in carreras:
+        evaluaciones = EvaluacionAcademica.objects.filter(
+            periodo_de_nivelacion=periodo_db,
+            estudiante__carrera_registrada=carrera,
+        )
+        total = evaluaciones.count()
+        if total == 0:
+            continue
+
+        aprobados = evaluaciones.filter(estado_de_aprobacion="Aprobado").count()
+        reprobados = evaluaciones.filter(estado_de_aprobacion="Reprobado").count()
+        retirados = evaluaciones.filter(estado_de_aprobacion="Retirado").count()
+        anulados = evaluaciones.filter(estado_de_aprobacion="Anulado").count()
+        pendientes = evaluaciones.filter(estado_de_aprobacion="Pendiente").count()
+        formalizados = evaluaciones.filter(estado_revision="Formalizado").count()
+
+        informe.append({
+            "carrera": carrera.nombre,
+            "total": total,
+            "aprobados": aprobados,
+            "reprobados": reprobados,
+            "retirados": retirados,
+            "anulados": anulados,
+            "pendientes": pendientes,
+            "formalizados": formalizados,
+            "porcentaje_aprobacion": round(aprobados / total * 100, 1) if total > 0 else 0,
+        })
+
+    return informe
