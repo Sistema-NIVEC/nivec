@@ -41,7 +41,6 @@ class UnidadCurricular(IUnidadEvaluable):
         self._porcentaje_minimo_asistencia = porcentaje_minimo_asistencia
 
     # ── Properties (Encapsulación) ──
-
     @property
     def codigo_de_unidad(self):
         return self._codigo_de_unidad
