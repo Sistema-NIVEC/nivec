@@ -1,0 +1,108 @@
+{% extends "base_listar.html" %}
+
+{% block titulo %}Estudiante - NIVEC{% endblock %}
+
+{% block boton_registrar %}
+    {% if puede_registir_estudiante and not solo_lectura %}
+    <a href="{% url 'registrar_estudiante' %}{% if periodo_seleccionado %}?periodo={{ periodo_seleccionado.id }}{% endif %}" class="boton boton-primario">{{ texto_registrar|default:"Registrar" }}</a>
+    {% endif %}
+{% endblock %}
+
+{% block filtros %}
+    <form method="get" style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+        <span style="font-size: 13px; font-weight: bold; color: #253237; font-family: inherit;">Periodo de nivelación</span>
+        <select name="periodo" onchange="this.form.submit()"
+                style="padding: 8px 12px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; font-weight: 500; font-family: inherit;">
+            <option value=""></option>
+            {% for p in periodos %}
+                <option value="{{ p.id }}" {% if periodo_seleccionado.id == p.id %}selected{% endif %}>
+                    {{ p.anio }} - Periodo {{ p.numero_periodo }}
+                </option>
+            {% endfor %}
+        </select>
+        {% if not es_coordinador_ua %}
+        <span style="font-size: 13px; font-weight: bold; color: #253237; font-family: inherit;">Campus</span>
+        <select name="campus" onchange="this.form.submit()"
+                style="padding: 8px 12px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; font-weight: 500; font-family: inherit;">
+            <option value=""></option>
+            {% for c in campus_disponibles %}
+            <option value="{{ c.id }}" {% if campus_filtro == c.id|stringformat:"d" %}selected{% endif %}>{{ c.nombre }}</option>
+            {% endfor %}
+        </select>
+        <span style="font-size: 13px; font-weight: bold; color: #253237; font-family: inherit;">Carrera</span>
+        <select name="carrera" onchange="this.form.submit()"
+                style="padding: 8px 12px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; font-weight: 500; font-family: inherit;">
+            <option value=""></option>
+            {% for car in carreras_disponibles %}
+            <option value="{{ car.id }}" {% if carrera_filtro == car.id|stringformat:"d" %}selected{% endif %}>{{ car.nombre }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <input type="text" name="busqueda" value="{{ busqueda }}" placeholder="Apellidos y Nombres..."
+               oninput="this.form.submit()"
+               style="padding: 10px 14px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; min-width: 300px; font-weight: 500; font-family: inherit;">
+    </form>
+{% endblock %}
+
+{% block cabeceras_tabla %}
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Número de identificación</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Apellidos y Nombres</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Correo institucional</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Número de identificación institucional</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Número de matrícula</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Jornada registrada</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Registro de cupo</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Campus registrado</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Carrera registrada</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Estado de usuario</th>
+    {% if puede_modificar_estudiante or puede_eliminar_estudiante or puede_retirar_estudiante %}
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Acciones</th>
+    {% endif %}
+{% endblock %}
+
+{% block cuerpo_tabla %}
+    {% for est in estudiantes %}
+    <tr>
+        <td style="font-family: monospace; text-align: left;">{{ est.usuario_de_sistema.identificacion }}</td>
+        <td style="text-align: left;">{{ est.usuario_de_sistema.apellidos }} {{ est.usuario_de_sistema.nombres }}</td>
+        <td style="text-align: left;">{{ est.usuario_de_sistema.correo_institucional }}</td>
+        <td style="font-family: monospace; text-align: left;">{{ est.identificador_institucional }}</td>
+        <td style="font-family: monospace; text-align: left;">{{ est.numero_de_matricula }}</td>
+        <td style="text-align: left;">{{ est.get_jornada_display }}</td>
+        <td style="text-align: left;">{{ est.get_registro_de_cupo_display }}</td>
+        <td style="text-align: left;">{{ est.campus_registrado.nombre }}</td>
+        <td style="text-align: left;">{{ est.carrera_registrada.nombre }}</td>
+        <td style="text-align: left;"><span style="font-weight: bold; color: #253237; font-size: 13px;">{{ est.usuario_de_sistema.estado_de_usuario }}</span></td>
+        {% if puede_modificar_estudiante or puede_eliminar_estudiante or puede_retirar_estudiante %}
+        <td style="text-align: left; white-space: nowrap;">
+            {% if puede_modificar_estudiante %}
+            <a href="{% url 'modificar_estudiante' est.id %}" class="etiqueta-accion etiqueta-modificar">Modificar</a>
+            {% endif %}
+
+            {% if est.estado_de_matricula == 'Matriculado' %}
+                {% if puede_retirar_estudiante %}
+                <a href="{% url 'solicitar_retiro' est.id %}" onclick="return confirm('Confirmar acción');" class="etiqueta-accion etiqueta-naranja">Retirar</a>
+                {% endif %}
+                {% if puede_anular_estudiante %}
+                <a href="{% url 'anular_matricula' est.id %}" onclick="return confirm('Confirmar acción');" class="etiqueta-accion etiqueta-naranja">Anular</a>
+                {% endif %}
+            {% elif puede_reincorporar_estudiante %}
+                <a href="{% url 'formalizar_matricula' est.id %}" onclick="return confirm('Confirmar acción');" class="etiqueta-accion etiqueta-naranja">Reincorporar</a>
+            {% endif %}
+
+            {% if puede_eliminar_estudiante %}
+            <a href="{% url 'eliminar_estudiante' est.id %}" onclick="return confirm('Confirmar acción');" class="etiqueta-accion etiqueta-eliminar">Eliminar</a>
+            {% endif %}
+        </td>
+        {% endif %}
+    </tr>
+    {% empty %}
+    {% if not busqueda and not periodo_seleccionado and not campus_filtro and not carrera_filtro %}
+    <tr>
+        <td colspan="{% if puede_modificar_estudiante or puede_eliminar_estudiante or puede_retirar_estudiante %}11{% else %}10{% endif %}" style="text-align: center; color: #9db4c0; padding: 30px;">
+            No existen registros actualmente
+        </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+{% endblock %}
