@@ -1,0 +1,65 @@
+{% extends "base_formulario.html" %}
+
+{% block form_fields %}
+<style>
+    .etiqueta-accion {
+        padding: 6px 14px;
+        border-radius: 6px; 
+        font-size: 12px;
+        text-decoration: none;
+        display: inline-block;
+        font-weight: bold;
+        transition: all 0.2s ease;
+        border: none;
+        cursor: pointer;
+    }
+    
+    .etiqueta-iniciar {
+        background: #253237;
+        color: white;
+    }
+    
+    .etiqueta-iniciar:hover {
+        opacity: 0.85;
+    }
+    
+    .etiqueta-evaluacion {
+        background: #5c6b73;
+        color: white;
+    }
+    
+    .etiqueta-evaluacion:hover {
+        opacity: 0.85;
+    }
+    
+    .etiqueta-finalizar {
+        background: #253237;
+        color: white;
+    }
+    
+    .etiqueta-finalizar:hover {
+        opacity: 0.85;
+    }
+</style>
+
+{% if periodo %}
+    <div style="background-color: #f5f5f7; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #DADBDB;">
+        <div>
+            <span style="font-size: 12px; font-weight: bold; color: #5c6b73; display: block;">Estado actual</span>
+            <strong style="font-size: 13px; color: #253237; font-family: inherit;">{{ periodo.get_estado_display }}</strong>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            {% if periodo.estado == 'Planificación' or periodo.estado == 'PLANIFICACION' %}
+                <a href="{% url 'iniciar_periodo' periodo.id %}" onclick="return confirm('Confirmar acción');" class="etiqueta-accion etiqueta-iniciar">Iniciar periodo</a>
+            {% elif periodo.estado == 'En curso' or periodo.estado == 'EN_CURSO' %}
+                <a href="{% url 'pasar_a_evaluacion' periodo.id %}" onclick="return confirm('Confirmar acción');" class="etiqueta-accion etiqueta-evaluacion">En evaluación</a>
+                <a href="{% url 'finalizar_periodo' periodo.id %}" onclick="return confirm('Confirmar acción');" class="etiqueta-accion etiqueta-finalizar">Finalizar periodo</a>
+            {% elif periodo.estado == 'Evaluación' or periodo.estado == 'EVALUACION' %}
+                <a href="{% url 'finalizar_periodo' periodo.id %}" onclick="return confirm('Confirmar acción');" class="etiqueta-accion etiqueta-finalizar">Finalizar periodo</a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+
+{{ block.super }}
+{% endblock %}

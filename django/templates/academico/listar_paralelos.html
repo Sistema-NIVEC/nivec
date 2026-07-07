@@ -1,0 +1,105 @@
+{% extends "base_listar.html" %}
+
+{% block boton_registrar %}
+    {% if puede_distribuir %}
+    <a href="{% url 'generar_paralelos' %}" class="boton boton-primario">Distribuir Paralelos</a>
+    {% endif %}
+{% endblock %}
+
+{% block filtros %}
+<form method="get" style="margin-bottom: 16px;">
+    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
+        <span style="font-size: 13px; font-weight: bold; color: #253237; font-family: inherit;">Periodo</span>
+        <select name="periodo" onchange="this.form.submit()"
+                style="padding: 10px 14px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; font-weight: 500; font-family: inherit; min-width: 200px;">
+            <option value=""></option>
+            {% for p in periodos %}
+                <option value="{{ p.id }}" {% if periodo_seleccionado.id == p.id %}selected{% endif %}>
+                    {{ p.periodo }} ({{ p.anio }})
+                </option>
+            {% endfor %}
+        </select>
+
+        {% if not es_coordinador_ua %}
+        <span style="font-size: 13px; font-weight: bold; color: #253237; font-family: inherit;">Campus</span>
+        <select name="campus" onchange="this.form.submit()"
+                style="padding: 10px 14px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; font-weight: 500; font-family: inherit; min-width: 200px;">
+            <option value=""></option>
+            {% for c in campus_disponibles %}
+                <option value="{{ c.id }}" {% if campus_filtro == c.id|stringformat:"d" %}selected{% endif %}>
+                    {{ c.nombre }}
+                </option>
+            {% endfor %}
+        </select>
+        {% endif %}
+    </div>
+    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+        {% if not es_coordinador_ua %}
+        <span style="font-size: 13px; font-weight: bold; color: #253237; font-family: inherit;">Carrera</span>
+        <select name="carrera" onchange="this.form.submit()"
+                style="padding: 10px 14px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; font-weight: 500; font-family: inherit; min-width: 200px;">
+            <option value=""></option>
+            {% for c in carreras %}
+                <option value="{{ c.id }}" {% if carrera_seleccionada.id == c.id %}selected{% endif %}>
+                    {{ c.nombre }}
+                </option>
+            {% endfor %}
+        </select>
+        {% endif %}
+
+        <span style="font-size: 13px; font-weight: bold; color: #253237; font-family: inherit;">Jornada</span>
+        <select name="jornada" onchange="this.form.submit()"
+                style="padding: 10px 14px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; font-weight: 500; font-family: inherit; min-width: 200px;">
+            <option value=""></option>
+            {% for j in jornadas %}
+                <option value="{{ j }}" {% if jornada_filtro == j %}selected{% endif %}>{{ j }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</form>
+{% endblock %}
+
+{% block cabeceras_tabla %}
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Código de Paralelo</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Nombre</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Periodo de nivelación</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Campus especificado</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Carrera especificada</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Jornada</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Unidades curriculares</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Número de estudiantes registrados</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Capacidad máxima de estudiantes especificada</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Acciones</th>
+{% endblock %}
+
+{% block cuerpo_tabla %}
+    {% for p in paralelos %}
+    <tr>
+        <td style="font-family: monospace; text-align: left; color: #1d1d1f;">{{ p.codigo }}</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ p.nombre }}</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ p.periodo }}</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ p.campus }}</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ p.carrera }}</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ p.jornada }}</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ p.unidades }} unidades curriculares</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ p.estudiantes }} estudiantes</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ p.capacidad }} estudiantes</td>
+        <td style="text-align: left; white-space: nowrap;">
+            <a href="{% url 'detalle_paralelo' p.representativo_id %}" class="etiqueta-accion etiqueta-naranja">Ver información</a>
+            {% if puede_eliminar_paralelo %}
+            <a href="{% url 'eliminar_paralelo' p.representativo_id %}"
+               onclick="return confirm('Confirmar acción');"
+               class="etiqueta-accion etiqueta-eliminar">Eliminar</a>
+            {% endif %}
+        </td>
+    </tr>
+    {% empty %}
+    {% if not periodo_seleccionado and not carrera_seleccionada and not jornada_filtro and not campus_filtro %}
+    <tr>
+        <td colspan="10" style="text-align: center; color: #9db4c0; padding: 30px;">
+            No existen registros actualmente
+        </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+{% endblock %}
