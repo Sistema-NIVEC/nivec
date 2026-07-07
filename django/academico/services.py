@@ -1348,4 +1348,3 @@ def servicio_cargar_calificaciones_desde_excel(archivo, paralelo_db, unidad_curr
             resultado["advertencias"].append(f"Fila {numero_fila} omitida ({str(e)})")
 
     return resultado
-
