@@ -122,6 +122,7 @@ class UnidadCurricular(models.Model):
     def __str__(self):
         return f"{self.codigo_de_unidad} ({self.nombre})"
 
+
 # ══════════════════════════════════════════════════════════════
 # PERIODO DE NIVELACIÓN
 # ══════════════════════════════════════════════════════════════
@@ -278,6 +279,7 @@ class CohorteDeMatricula(models.Model):
         cohorte_de_matricula.total_exonerados = self.total_exonerados
 
         return cohorte_de_matricula.calcular_total_matriculados()
+
 
 class MatriculaParalelo(models.Model):
     estudiante = models.ForeignKey(
@@ -442,5 +444,3 @@ class InformeGeneral(models.Model):
 
     def __str__(self):
         return f"{self.codigo_de_informe} ({self.estado_de_informe})"
-
-    
