@@ -1,0 +1,104 @@
+{% extends "base_listar.html" %}
+
+{% block filtros %}
+<form method="get" style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+    {% if not es_coordinador_ua %}
+    <span style="font-size: 13px; font-weight: bold; color: #253237; font-family: inherit;">Campus</span>
+    <select name="campus" onchange="this.form.submit()"
+            style="padding: 10px 14px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; font-weight: 500; font-family: inherit; min-width: 200px;">
+        <option value=""></option>
+        {% for c in campus_disponibles %}
+        <option value="{{ c.id }}" {% if campus_filtro == c.id|stringformat:"d" %}selected{% endif %}>{{ c.nombre }}</option>
+        {% endfor %}
+    </select>
+
+    <span style="font-size: 13px; font-weight: bold; color: #253237; font-family: inherit;">Carrera</span>
+    <select name="carrera" onchange="this.form.submit()"
+            style="padding: 10px 14px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; font-weight: 500; font-family: inherit; min-width: 200px;">
+        <option value=""></option>
+        {% for car in carreras_disponibles %}
+        <option value="{{ car.id }}" {% if carrera_filtro == car.id|stringformat:"d" %}selected{% endif %}>{{ car.nombre }}</option>
+        {% endfor %}
+    </select>
+    {% endif %}
+</form>
+{% endblock %}
+
+{% block cabeceras_tabla %}
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Código de Malla curricular</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Carrera registrada</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Nombre</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Versión de Malla curricular</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Total horas de nivelación</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Estado</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Unidades curriculares</th>
+    {% if puede_modificar_malla or puede_eliminar_malla %}
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Acciones</th>
+    {% endif %}
+{% endblock %}
+
+{% block cuerpo_tabla %}
+    {% for m in mallas %}
+    <tr>
+        <td style="font-family: monospace; text-align: left; color: #1d1d1f;">{{ m.codigo_de_malla }}</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ m.carrera.nombre }}</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ m.nombre }}</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ m.version_de_malla }}</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ m.total_horas_nivelacion }} horas</td>
+        <td style="text-align: left;">
+            <span style="font-weight: bold; color: #253237; font-size: 13px;">{{ m.get_estado_display }}</span>
+        </td>
+        <td style="text-align: left;">
+            <a href="{% url 'listar_unidades_de_malla' m.id %}"
+               style="color: #1d1d1f; text-decoration: none; font-size: 13px;">
+                {{ m.unidades_curriculares.count }} unidades
+            </a>
+        </td>
+        {% if puede_modificar_malla or puede_eliminar_malla %}
+        <td style="text-align: left; white-space: nowrap;">
+            {% if puede_modificar_malla %}
+            <a href="{% url 'modificar_malla' m.id %}" class="etiqueta-accion etiqueta-modificar">Modificar</a>
+            {% endif %}
+
+            {% if puede_copiar_malla %}
+            <a href="{% url 'clonar_malla' m.id %}" class="etiqueta-accion etiqueta-naranja">Copiar</a>
+            {% endif %}
+
+            {% if puede_cambiar_estado_malla %}
+                {% if m.estado == "Diseño" %}
+                    <a href="{% url 'cambiar_estado_malla' m.id 'activar' %}"
+                       onclick="return confirm('Confirmar acción');"
+                       class="etiqueta-accion etiqueta-naranja">Habilitar</a>
+                    <a href="{% url 'cambiar_estado_malla' m.id 'inactivar' %}"
+                       onclick="return confirm('Confirmar acción');"
+                       class="etiqueta-accion etiqueta-naranja">Descontinuar</a>
+                {% elif m.estado == "Activa" %}
+                    <a href="{% url 'cambiar_estado_malla' m.id 'historica' %}"
+                       onclick="return confirm('Confirmar acción');"
+                       class="etiqueta-accion etiqueta-naranja">Histórica</a>
+                    <a href="{% url 'cambiar_estado_malla' m.id 'inactivar' %}"
+                       onclick="return confirm('Confirmar acción');"
+                       class="etiqueta-accion etiqueta-naranja">Deshabilitar</a>
+                {% elif m.estado == "Inactiva" %}
+                    <a href="{% url 'cambiar_estado_malla' m.id 'activar' %}"
+                       onclick="return confirm('Confirmar acción');"
+                       class="etiqueta-accion etiqueta-naranja">Habilitar</a>
+                {% endif %}
+            {% endif %}
+
+            {% if puede_eliminar_malla %}
+            <a href="{% url 'eliminar_malla' m.id %}" onclick="return confirm('Confirmar acción');" class="etiqueta-accion etiqueta-eliminar">Eliminar</a>
+            {% endif %}
+        </td>
+        {% endif %}
+    </tr>
+    {% empty %}
+    {% if not carrera_filtro and not campus_filtro %}
+    <tr>
+        <td colspan="8" style="text-align: center; color: #9db4c0; padding: 30px;">
+            No existen registros actualmente
+        </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+{% endblock %}
