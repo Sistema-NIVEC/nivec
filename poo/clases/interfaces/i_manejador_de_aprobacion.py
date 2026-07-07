@@ -1,0 +1,15 @@
+clases/interfaces/i_manejador_aprobacion.py
+
+#Patrón de comportamiento: Chain of Responsibility
+#Al recibir una solicitud, cada manejador decide si la procesa o si la pasa al siguiente manejador de la cadena
+from abc import ABCMeta
+from abc import abstractmethod
+from poo.clases.enums.estado_de_aprobacion import EstadoDeAprobacion
+
+class IManejadorAprobacion(Metaclass = ABCMeta):
+    def __init__(self, siguiente = None):
+        self.siguiente = siguiente #referencia al siguiente manejador
+
+    @abstractmethod
+    def manejar(self, evaluacion):
+        pass
