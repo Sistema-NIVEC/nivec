@@ -1,0 +1,58 @@
+{% extends "base_listar.html" %}
+
+{% block filtros %}
+<form method="get" style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+    <span style="font-size: 13px; font-weight: bold; color: #253237; font-family: inherit;">Campus</span>
+    <select name="campus" onchange="this.form.submit()"
+            style="padding: 10px 14px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; font-weight: 500; font-family: inherit; min-width: 200px;">
+        <option value=""></option>
+        {% for c in campus_disponibles %}
+        <option value="{{ c.id }}" {% if campus_filtro == c.id|stringformat:"d" %}selected{% endif %}>{{ c.nombre }}</option>
+        {% endfor %}
+    </select>
+    <input type="text" name="busqueda" value="{{ busqueda }}" placeholder="Nombre de Carrera..."
+           oninput="this.form.submit()"
+           style="padding: 10px 14px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; min-width: 300px; font-weight: 500; font-family: inherit;">
+</form>
+{% endblock %}
+
+{% block cabeceras_tabla %}
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Código de Carrera</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Campus registrado</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Nombre</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Vigencia SNIESE</th>
+    {% if puede_modificar_carrera or puede_eliminar_carrera %}
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Acciones</th>
+    {% endif %}
+{% endblock %}
+
+{% block cuerpo_tabla %}
+    {% for c in carreras %}
+    <tr>
+        <td style="font-family: monospace; text-align: left;">{{ c.codigo_de_carrera }}</td>
+        <td style="text-align: left;">{{ c.campus.nombre }}</td>
+        <td style="text-align: left;">{{ c.nombre }}</td>
+        <td style="text-align: left;">{{ c.vigencia_sniese }}</td>
+        {% if puede_modificar_carrera or puede_eliminar_carrera %}
+        <td style="text-align: left;">
+            {% if puede_modificar_carrera %}
+            <a href="{% url 'modificar_carrera' c.id %}" class="etiqueta-accion etiqueta-modificar">Modificar</a>
+            {% endif %}
+            {% if puede_eliminar_carrera %}
+            <a href="{% url 'eliminar_carrera' c.id %}" 
+               onclick="return confirm('Confirmar acción');"
+               class="etiqueta-accion etiqueta-eliminar">Eliminar</a>
+            {% endif %}
+        </td>
+        {% endif %}
+    </tr>
+    {% empty %}
+    {% if not busqueda and not campus_filtro %}
+    <tr>
+        <td colspan="{% if puede_modificar_carrera or puede_eliminar_carrera %}5{% else %}4{% endif %}" style="text-align: center; color: #9db4c0; padding: 30px;">
+            No existen registros actualmente
+        </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+{% endblock %}
