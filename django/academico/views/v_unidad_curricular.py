@@ -1,0 +1,322 @@
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.db.models import ProtectedError
+from django.http import HttpResponse
+import openpyxl
+
+from academico.models import UnidadCurricular, MallaCurricular, Carrera
+from academico.forms import FormularioUnidadCurricular
+from academico.services import (
+    servicio_unidad_registrar_masivo_desde_excel,
+    servicio_recalcular_total_horas_malla,
+)
+from poo.clases.enums.estado_de_malla import EstadoDeMalla
+from usuarios.utils import (
+    generar_identificador_siguiente,
+    requiere_perfil,
+    usuario_es_solo_lectura,
+    ROL_COORDINADOR_DAN,
+    ROL_DIRECTOR_DAN,
+    ROL_RECTOR,
+    ROL_VICERRECTOR,
+    ROL_COORDINADOR_UA,
+)
+
+ROLES_VISUALIZAN = (ROL_COORDINADOR_DAN, ROL_DIRECTOR_DAN, ROL_RECTOR, ROL_VICERRECTOR, ROL_COORDINADOR_UA)
+ROLES_MODIFICAN = (ROL_COORDINADOR_DAN, ROL_DIRECTOR_DAN)
+ESTADOS_MALLA_EDITABLE = [EstadoDeMalla.DISENO.value, EstadoDeMalla.ACTIVA.value]
+
+@requiere_perfil(*ROLES_VISUALIZAN)
+def listar_unidades(request):
+    universidad_usuario = request.user.perfil_administrativo.universidad
+    if not universidad_usuario:
+        messages.warning(request, "La Institución no ha sido registrada actualmente")
+        return redirect("panel_principal")
+
+    from usuarios.utils import obtener_rol_usuario
+    rol = obtener_rol_usuario(request.user)
+    es_coordinador_ua = (rol == ROL_COORDINADOR_UA)
+
+    carreras_disponibles = Carrera.objects.filter(campus__universidad=universidad_usuario).order_by("nombre")
+    mallas_disponibles = MallaCurricular.objects.filter(carrera__campus__universidad=universidad_usuario).order_by("nombre")
+
+    if es_coordinador_ua:
+        perfil_admin = getattr(request.user, 'perfil_administrativo', None)
+        if perfil_admin and perfil_admin.carrera_asignada:
+            mallas_disponibles = mallas_disponibles.filter(carrera=perfil_admin.carrera_asignada)
+
+    carrera_filtro = request.GET.get("carrera", "")
+    malla_filtro = request.GET.get("malla", "")
+    busqueda = request.GET.get("busqueda", "").strip()
+
+    unidades = UnidadCurricular.objects.filter(
+        malla_curricular__carrera__campus__universidad=universidad_usuario
+    ).select_related("malla_curricular__carrera")
+
+    if es_coordinador_ua:
+        perfil_admin = getattr(request.user, 'perfil_administrativo', None)
+        if perfil_admin and perfil_admin.carrera_asignada:
+            unidades = unidades.filter(malla_curricular__carrera=perfil_admin.carrera_asignada)
+
+    unidades = unidades.order_by("codigo_de_unidad")
+
+    if carrera_filtro:
+        unidades = unidades.filter(malla_curricular__carrera_id=carrera_filtro)
+    if malla_filtro:
+        unidades = unidades.filter(malla_curricular_id=malla_filtro)
+    if busqueda:
+        unidades = unidades.filter(nombre__icontains=busqueda)
+
+    solo_lectura = usuario_es_solo_lectura(request.user)
+
+    from academico.permisos import obtener_permisos_periodo
+    permisos = obtener_permisos_periodo(universidad_usuario)
+
+    return render(request, "academico/listar_unidades.html", {
+        "solo_lectura": solo_lectura,
+        "unidades": unidades,
+        "carreras_disponibles": carreras_disponibles,
+        "mallas_disponibles": mallas_disponibles,
+        "carrera_filtro": carrera_filtro,
+        "malla_filtro": malla_filtro,
+        "busqueda": busqueda,
+        "es_coordinador_ua": es_coordinador_ua,
+        "titulo_pagina": "Unidad curricular - NIVEC",
+        "titulo": "Unidades curriculares",
+        "url_registrar": "registrar_unidad" if permisos["puede_registrar_unidad"] and not solo_lectura else None,
+        "texto_registrar": "Registrar",
+        "url_volver": "panel_principal",
+        "puede_modificar_unidad": permisos["puede_modificar_unidad"] and not solo_lectura,
+        "puede_eliminar_unidad": permisos["puede_eliminar_unidad"] and not solo_lectura,
+        "puede_registrar_unidad": permisos["puede_registrar_unidad"] and not solo_lectura,
+    })
+
+@requiere_perfil(*ROLES_VISUALIZAN)
+def listar_unidades_de_malla(request, malla_id):
+    universidad_usuario = request.user.perfil_administrativo.universidad
+    if not universidad_usuario:
+        messages.warning(request, "La Institución no ha sido registrada actualmente")
+        return redirect("panel_principal")
+
+    malla = get_object_or_404(
+        MallaCurricular, id=malla_id, carrera__campus__universidad=universidad_usuario
+    )
+
+    unidades = UnidadCurricular.objects.filter(
+        malla_curricular=malla
+    ).select_related("malla_curricular").order_by("codigo_de_unidad")
+
+    # Calcular indicador de horas sincrónicas semanales vs límite
+    from poo.clases.franja_horaria import validar_malla_cabe_en_horario, SEMANAS_REFERENCIA_MINIMA, LIMITE_HORAS_SINCRONICAS_SEMANALES_MALLA
+    from django.db.models import Sum
+    from academico.permisos import obtener_permisos_periodo
+    import math
+
+    total_sincronicas = unidades.aggregate(total=Sum("horas_sincronicas"))["total"] or 0.0
+    horas_semanales = math.ceil(total_sincronicas / SEMANAS_REFERENCIA_MINIMA) if total_sincronicas > 0 else 0
+    limite_semanal = LIMITE_HORAS_SINCRONICAS_SEMANALES_MALLA
+    excede_limite = horas_semanales > limite_semanal
+    permisos = obtener_permisos_periodo(universidad_usuario)
+
+    return render(request, "academico/listar_unidades.html", {
+        "solo_lectura": usuario_es_solo_lectura(request.user),
+        "unidades": unidades,
+        "malla": malla,
+        "total_sincronicas": total_sincronicas,
+        "horas_semanales": horas_semanales,
+        "limite_semanal": limite_semanal,
+        "semanas_referencia": SEMANAS_REFERENCIA_MINIMA,
+        "excede_limite": excede_limite,
+        "puede_modificar_unidad": permisos["puede_modificar_unidad"] and not usuario_es_solo_lectura(request.user),
+        "puede_eliminar_unidad": permisos["puede_eliminar_unidad"] and not usuario_es_solo_lectura(request.user),
+        "puede_registrar_unidad": permisos["puede_registrar_unidad"] and not usuario_es_solo_lectura(request.user),
+        "titulo_pagina": "Unidad curricular - NIVEC",
+        "titulo": f"Unidades curriculares ({malla.nombre})",
+        "url_registrar": "registrar_unidad" if permisos["puede_registrar_unidad"] and not usuario_es_solo_lectura(request.user) else None,
+        "texto_registrar": "Registrar",
+        "url_volver": "panel_principal"
+    })
+
+@requiere_perfil(*ROLES_MODIFICAN)
+def descargar_plantilla_unidad(request):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Unidades curriculares"
+
+    cabeceras = [
+        "Código de malla (MC...)",
+        "Nombre de la Unidad curricular",
+        "Horas totales (número entero)",
+        "Horas sincrónicas (número entero)",
+        "Horas asincrónicas (número entero)",
+        "Criterio de aprobación (0.0 - 10.0)",
+        "Porcentaje mínimo de asistencia (0.0 - 100.0)",
+    ]
+    ws.append(cabeceras)
+
+    for col in range(1, len(cabeceras) + 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 40
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = 'attachment; filename="unidades_curriculares_nivec.xlsx"'
+    wb.save(response)
+    return response
+
+@requiere_perfil(*ROLES_MODIFICAN)
+def registrar_unidad(request):
+    universidad_usuario = request.user.perfil_administrativo.universidad
+    if not universidad_usuario:
+        messages.warning(request, "La Institución no ha sido registrada actualmente")
+        return redirect("panel_principal")
+
+    mallas_existentes = MallaCurricular.objects.filter(
+        carrera__campus__universidad=universidad_usuario,
+        estado__in=ESTADOS_MALLA_EDITABLE,
+    )
+    if not mallas_existentes.exists():
+        messages.warning(
+            request,
+            "No existen registros de Mallas curriculares válidos actualmente"
+        )
+        return redirect("listar_mallas")
+
+    malla_id = request.GET.get("malla")
+    malla_contexto = mallas_existentes.filter(id=malla_id).first() if malla_id else None
+
+    if request.method == "POST":
+        if "archivo_excel" in request.FILES:
+            archivo = request.FILES["archivo_excel"]
+            if not archivo.name.endswith(".xlsx"):
+                messages.error(request, "Documento con formato no válido")
+                return redirect("registrar_unidad")
+
+            resultado = servicio_unidad_registrar_masivo_desde_excel(archivo, universidad_usuario)
+
+            if resultado["error"]:
+                messages.error(request, resultado["error"])
+                return redirect("registrar_unidad")
+
+            if resultado["exitosos"] > 0:
+                for malla in MallaCurricular.objects.filter(
+                    carrera__campus__universidad=universidad_usuario
+                ):
+                    servicio_recalcular_total_horas_malla(malla)
+                messages.success(
+                    request,
+                    f"{resultado['exitosos']} Unidades curriculares registradas correctamente"
+                )
+
+            for adv in resultado["advertencias"]:
+                messages.warning(request, adv)
+
+            if resultado["exitosos"] == 0 and not resultado["advertencias"]:
+                messages.info(request, "El documento no contiene registros para procesar")
+
+            return redirect("listar_unidades")
+
+        else:
+            formulario = FormularioUnidadCurricular(request.POST)
+            formulario.fields["malla_curricular"].queryset = mallas_existentes
+
+            if formulario.is_valid():
+                nueva_unidad = formulario.save(commit=False)
+                nueva_unidad.codigo_de_unidad = generar_identificador_siguiente(
+                    UnidadCurricular, "UC", "codigo_de_unidad"
+                )
+                nueva_unidad.save()
+                servicio_recalcular_total_horas_malla(nueva_unidad.malla_curricular)
+                messages.success(
+                    request, "La Unidad curricular ha sido registrada correctamente"
+                )
+                if malla_contexto:
+                    return redirect("listar_unidades_de_malla", malla_id=malla_contexto.id)
+                return redirect("listar_unidades")
+    else:
+        formulario = FormularioUnidadCurricular(
+            initial={"malla_curricular": malla_contexto} if malla_contexto else None
+        )
+        formulario.fields["malla_curricular"].queryset = mallas_existentes
+
+    return render(request, "academico/formulario_unidad.html", {
+        "formulario": formulario,
+        "titulo_pagina": "Unidad curricular - NIVEC",
+        "titulo": "Registrar Unidad curricular",
+        "boton_texto": "Registrar",
+        "url_cancelar": "listar_unidades",
+        "mostrar_carga_masiva": True,
+        "url_plantilla": "descargar_plantilla_unidad",
+    })
+
+@requiere_perfil(*ROLES_MODIFICAN)
+def modificar_unidad(request, unidad_id):
+    universidad_usuario = request.user.perfil_administrativo.universidad
+    if not universidad_usuario:
+        messages.warning(request, "La Institución no ha sido registrada actualmente")
+        return redirect("panel_principal")
+
+    unidad = get_object_or_404(
+        UnidadCurricular,
+        id=unidad_id,
+        malla_curricular__carrera__campus__universidad=universidad_usuario
+    )
+
+    if request.method == "POST":
+        malla_anterior_id = unidad.malla_curricular_id
+        formulario = FormularioUnidadCurricular(request.POST, instance=unidad)
+        formulario.fields["malla_curricular"].queryset = MallaCurricular.objects.filter(
+            carrera__campus__universidad=universidad_usuario,
+            estado__in=ESTADOS_MALLA_EDITABLE,
+        )
+        if formulario.is_valid():
+            unidad_modificada = formulario.save()
+            servicio_recalcular_total_horas_malla(unidad_modificada.malla_curricular)
+            if malla_anterior_id != unidad_modificada.malla_curricular_id:
+                malla_anterior = MallaCurricular.objects.filter(id=malla_anterior_id).first()
+                if malla_anterior:
+                    servicio_recalcular_total_horas_malla(malla_anterior)
+            messages.success(
+                request, "La Unidad curricular ha sido modificada correctamente"
+            )
+            return redirect("listar_unidades")
+    else:
+        formulario = FormularioUnidadCurricular(instance=unidad)
+        formulario.fields["malla_curricular"].queryset = MallaCurricular.objects.filter(
+            carrera__campus__universidad=universidad_usuario,
+             estado__in=ESTADOS_MALLA_EDITABLE,
+        )
+
+    return render(request, "academico/formulario_unidad.html", {
+        "formulario": formulario,
+        "titulo_pagina": "Unidad curricular - NIVEC",
+        "titulo": "Modificar Unidad curricular",
+        "boton_texto": "Modificar",
+        "url_cancelar": "listar_unidades",
+        "mostrar_carga_masiva": False,
+    })
+
+@requiere_perfil(*ROLES_MODIFICAN)
+def eliminar_unidad(request, unidad_id):
+    universidad_usuario = request.user.perfil_administrativo.universidad
+    if not universidad_usuario:
+        messages.warning(request, "La Institución no ha sido registrada actualmente")
+        return redirect("panel_principal")
+
+    unidad = get_object_or_404(
+        UnidadCurricular,
+        id=unidad_id,
+        malla_curricular__carrera__campus__universidad=universidad_usuario
+    )
+    malla = unidad.malla_curricular
+    try:
+        unidad.delete()
+        servicio_recalcular_total_horas_malla(malla)
+        messages.success(request, "La Unidad curricular ha sido eliminada correctamente")
+    except ProtectedError:
+        messages.error(
+            request,
+            "La Unidad curricular no se ha podido eliminar (registros asociados)"
+        )
+    return redirect("listar_unidades")

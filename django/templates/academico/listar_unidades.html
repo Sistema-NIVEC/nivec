@@ -1,51 +1,102 @@
 {% extends "base_listar.html" %}
 
+{% block boton_registrar %}
+    {% if puede_registrar_unidad and not solo_lectura %}
+    {% if malla %}
+        <a href="{% url 'registrar_unidad' %}?malla={{ malla.id }}" class="boton boton-primario">Registrar</a>
+    {% else %}
+        <a href="{% url 'registrar_unidad' %}" class="boton boton-primario">Registrar</a>
+    {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block filtros %}
+{% if malla %}
+<div style="margin-bottom: 16px; display: flex; align-items: center; gap: 12px;">
+    <span style="font-size: 13px; font-weight: bold; color: #253237;">
+        Horas sincrónicas semanales ({{ semanas_referencia }} semanas):
+    </span>
+    <span style="font-size: 13px; font-weight: bold; color: {% if excede_limite %}#B22222{% else %}#253237{% endif %};">
+        {{ horas_semanales }}h / {{ limite_semanal }}h
+    </span>
+    {% if excede_limite %}
+    <span style="font-size: 12px; color: #B22222;">
+        — Excede el límite. La malla no podrá generar horarios sin solapamiento
+    </span>
+    {% endif %}
+</div>
+{% else %}
+<form method="get" style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+    {% if not es_coordinador_ua %}
+    <span style="font-size: 13px; font-weight: bold; color: #253237; font-family: inherit;">Carrera</span>
+    <select name="carrera" onchange="this.form.submit()"
+            style="padding: 8px 12px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; font-weight: 500; font-family: inherit;">
+        <option value=""></option>
+        {% for car in carreras_disponibles %}
+        <option value="{{ car.id }}" {% if carrera_filtro == car.id|stringformat:"d" %}selected{% endif %}>{{ car.nombre }}</option>
+        {% endfor %}
+    </select>
+    {% endif %}
+    <span style="font-size: 13px; font-weight: bold; color: #253237; font-family: inherit;">Malla curricular</span>
+    <select name="malla" onchange="this.form.submit()"
+            style="padding: 8px 12px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; font-weight: 500; font-family: inherit;">
+        <option value=""></option>
+        {% for m in mallas_disponibles %}
+        <option value="{{ m.id }}" {% if malla_filtro == m.id|stringformat:"d" %}selected{% endif %}>{{ m.nombre }}</option>
+        {% endfor %}
+    </select>
+    <input type="text" name="busqueda" value="{{ busqueda }}" placeholder="Nombre de Unidad curricular..."
+           oninput="this.form.submit()"
+           style="padding: 10px 14px; border: 1px solid #DADBDB; border-radius: 8px; font-size: 13px; background: white; color: #253237; outline: none; min-width: 300px; font-weight: 500; font-family: inherit;">
+</form>
+{% endif %}
+{% endblock %}
+
 {% block cabeceras_tabla %}
-    <th style="font-weight: bold; text-align: left; color: #5c6b73">Código de Periodo</th>
-    <th style="font-weight: bold; text-align: left; color: #5c6b73">Periodo de nivelación</th>
-    <th style="font-weight: bold; text-align: left; color: #5c6b73">Año</th>
-    <th style="font-weight: bold; text-align: left; color: #5c6b73">Número de Periodo</th>
-    <th style="font-weight: bold; text-align: left; color: #5c6b73">Fecha</th>
-    <th style="font-weight: bold; text-align: left; color: #5c6b73">Modalidad</th>
-    <th style="font-weight: bold; text-align: left; color: #5c6b73">Estado</th>
-    {% if not solo_lectura %}
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Código de Unidad curricular</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Malla curricular</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Nombre</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Horas totales</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Horas sincrónicas</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Horas asincrónicas</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Criterio mínimo de aprobación</th>
+    <th style="font-weight: bold; text-align: left; color: #5c6b73">Asistencia mínima de aprobación</th>
+    {% if puede_modificar_unidad or puede_eliminar_unidad %}
     <th style="font-weight: bold; text-align: left; color: #5c6b73">Acciones</th>
     {% endif %}
 {% endblock %}
 
 {% block cuerpo_tabla %}
-    {% for p in periodos %}
+    {% for u in unidades %}
     <tr>
-        <td style="font-family: monospace; text-align: left;">{{ p.codigo_periodo }}</td>
-        <td style="text-align: left;">{{ p.periodo }}</td>
-        <td style="text-align: left;">{{ p.anio }}</td>
-        <td style="text-align: left;">{{ p.numero_periodo }}</td>
-        <td style="text-align: left; font-size: 12px;">{{ p.fecha_inicio|date:"d/m/Y" }} a {{ p.fecha_fin|date:"d/m/Y" }}</td>
-        <td style="text-align: left;">{{ p.get_modalidad_display }}</td>
-        <td style="text-align: left;">
-            <span style="font-weight: bold; color: #253237; font-size: 13px;">{{ p.get_estado_display }}</span>
-        </td>
-        {% if not solo_lectura %}
+        <td style="font-family: monospace; text-align: left; color: #1d1d1f;">{{ u.codigo_de_unidad }}</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ u.malla_curricular.nombre }}</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ u.nombre }}</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ u.horas_totales }} horas</td>
+        <td style="text-align: left;">{{ u.horas_sincronicas }} horas</td>
+        <td style="text-align: left;">{{ u.horas_asincronicas }} horas</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ u.criterio_de_aprobacion }}</td>
+        <td style="text-align: left; color: #1d1d1f;">{{ u.porcentaje_minimo_asistencia }}%</td>
+        {% if puede_modificar_unidad or puede_eliminar_unidad %}
         <td style="text-align: left; white-space: nowrap;">
-            {% if p.estado == "Planificación" %}
-                <a href="{% url 'modificar_periodo' p.id %}" class="etiqueta-accion etiqueta-modificar">Modificar</a>
-                <a href="{% url 'iniciar_periodo' p.id %}" onclick="return confirm('Confirmar acción');" class="etiqueta-accion etiqueta-naranja">Iniciar</a>
-                <a href="{% url 'eliminar_periodo' p.id %}" onclick="return confirm('Confirmar acción');" class="etiqueta-accion etiqueta-eliminar">Eliminar</a>
-            {% elif p.estado == "En curso" %}
-                <a href="{% url 'pasar_a_evaluacion' p.id %}" onclick="return confirm('Confirmar acción');" class="etiqueta-accion etiqueta-naranja">Evaluar</a>
-            {% elif p.estado == "Evaluación" %}
-                <a href="{% url 'finalizar_periodo' p.id %}" onclick="return confirm('Confirmar acción');" class="etiqueta-accion etiqueta-naranja">Finalizar</a>
-            {% elif p.estado == "Cerrado" %}
-                <a href="{% url 'eliminar_periodo' p.id %}" onclick="return confirm('Confirmar acción');" class="etiqueta-accion etiqueta-eliminar">Eliminar</a>
+            {% if puede_modificar_unidad %}
+            <a href="{% url 'modificar_unidad' u.id %}" class="etiqueta-accion etiqueta-modificar">Modificar</a>
+            {% endif %}
+            {% if puede_eliminar_unidad %}
+            <a href="{% url 'eliminar_unidad' u.id %}"
+               onclick="return confirm('Confirmar acción');"
+               class="etiqueta-accion etiqueta-eliminar">Eliminar</a>
             {% endif %}
         </td>
         {% endif %}
     </tr>
     {% empty %}
+    {% if not carrera_filtro and not malla_filtro and not busqueda %}
     <tr>
-        <td colspan="{% if solo_lectura %}7{% else %}8{% endif %}" style="text-align: center; color: #9db4c0; padding: 30px;">
+        <td colspan="9" style="text-align: center; color: #9db4c0; padding: 30px;">
             No existen registros actualmente
         </td>
     </tr>
+    {% endif %}
     {% endfor %}
 {% endblock %}
