@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ titulo_pagina|default:"NIVEC" }}{% endblock %}
+
+{% block contenido %}
+<style>
+    /* Estilos sincronizados para la tabla */
+    .tarjeta table th { 
+        white-space: nowrap; 
+        font-weight: bold; 
+        text-align: left; 
+        color: #5c6b73; 
+        padding: 12px 18px; 
+    }
+    .tarjeta table td { 
+        padding: 12px 18px; 
+        white-space: nowrap; 
+        font-family: inherit;
+        color: #1d1d1f;
+    }
+    .select-estandar {
+        padding: 8px 12px; 
+        border: 1px solid #DADBDB; 
+        border-radius: 8px; 
+        font-size: 13px; 
+        background: white; 
+        color: #1d1d1f; 
+        outline: none; 
+        font-family: inherit;
+    }
+</style>
+
+<h2 style="font-size: 16px; font-weight: bold; margin-bottom: 4px; color: #253237;">{{ titulo }}</h2>
+<p style="color: #5c6b73; font-size: 13px; font-weight: bold; margin-bottom: 20px;">
+    Reportes institucionales
+</p>
+
+<div style="margin-bottom: 20px;">
+    <form method="get" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <label style="font-weight: bold; font-size: 13px; color: #5c6b73;">Periodo de nivelación</label>
+        <select name="periodo" onchange="this.form.submit()" class="select-estandar">
+            <option value=""></option>
+            {% for p in periodos %}
+                <option value="{{ p.id }}" {% if periodo_seleccionado.id == p.id %}selected{% endif %}>
+                    {{ p.periodo }} ({{ p.anio }}) - {{ p.estado }}
+                </option>
+            {% endfor %}
+        </select>
+    </form>
+    
+    {% if periodo_seleccionado and informe %}
+    <div style="margin-top: 12px;">
+        <a href="{% url 'descargar_informe_general' %}?periodo={{ periodo_seleccionado.id }}" style="color: #253237; font-size: 13px; font-weight: bold; text-decoration: none;">Descargar documento</a>
+    </div>
+    {% endif %}
+</div>
+
+{% if not periodo_seleccionado %}
+<div class="tarjeta" style="text-align: center; color: #9db4c0; padding: 30px; font-weight: bold;">
+    Especifique el Periodo de nivelación
+</div>
+{% elif not informe %}
+<div class="tarjeta" style="text-align: center; color: #9db4c0; padding: 30px; font-weight: bold;">
+    No existen registros
+</div>
+{% else %}
+<div class="tarjeta" style="padding: 0; overflow-x: auto;">
+    <table style="width: 100%;">
+        <thead>
+            <tr>
+                <th>Código de Periodo</th>
+                <th>Periodo</th>
+                <th>Carrera</th>
+                <th>Número total de evaluaciones</th>
+                <th>Número de aprobados</th>
+                <th>Número de reprobados</th>
+                <th>Número de retirados</th>
+                <th>Número de anulados</th>
+                <th>Porcentaje de aprobación</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in informe %}
+            <tr>
+                <td style="font-family: monospace;">{{ periodo_seleccionado.codigo_periodo }}</td>
+                <td>{{ periodo_seleccionado.periodo }}</td>
+                <td>{{ f.carrera }}</td>
+                <td>{{ f.total }}</td>
+                <td style="color: #253237; font-weight: bold;">{{ f.aprobados }}</td>
+                <td style="color: #9db4c0; font-weight: bold;">{{ f.reprobados }}</td>
+                <td>{{ f.retirados }}</td>
+                <td>{{ f.anulados }}</td>
+                <td style="font-weight: bold;">{{ f.porcentaje_aprobacion }}%</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<div style="margin-top: 15px;">
+    <a href="{% url 'panel_principal' %}" class="boton boton-secundario">Volver</a>
+</div>
+{% endblock %}
