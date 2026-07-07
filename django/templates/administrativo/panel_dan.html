@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block titulo %}NIVEC{% endblock %}
+
+{% block contenido %}
+    <h2 style="margin-bottom: 20px;">Coordinación de dirección de admisión y nivelación</h2>
+
+    {% if estado_periodo == "EN_CURSO" %}
+    <p style="color: #253237; font-size: 13px; font-weight: bold; margin-bottom: 16px;">Periodo de nivelación en curso. Funcionalidades parcialmente deshabilitadas</p>
+    {% elif estado_periodo == "EVALUACION" %}
+    <p style="color: #253237; font-size: 13px; font-weight: bold; margin-bottom: 16px;">Periodo de nivelación en evaluación. Funcionalidades parcialmente deshabilitadas</p>
+    {% elif estado_periodo == "SOLO_CERRADOS" %}
+    <p style="color: #253237; font-size: 13px; font-weight: bold; margin-bottom: 16px;">El Periodo de nivelación ha finalizado</p>
+    {% elif estado_periodo == "PLANIFICACION" %}
+    <p style="color: #253237; font-size: 13px; font-weight: bold; margin-bottom: 16px;">Periodo de nivelación en planificación</p>
+    {% endif %}
+
+    <div style="margin-bottom: 20px;">
+        <a href="{% url 'detalle_universidad' %}" class="boton boton-secundario">Información institucional</a>
+    </div>
+
+    {% if tiene_campus or tiene_carreras or tiene_periodos %}
+    <div class="tarjeta">
+        <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 4px;">Institución</h2>
+        <p style="color: #5c6b73; margin-bottom: 16px; font-size: 13px; font-weight: bold;">Base institucional</p>
+        <div class="acciones" style="margin-bottom: 0;">
+            {% if tiene_campus %}
+            <a href="{% url 'listar_campus' %}" class="boton boton-secundario">Campus</a>
+            {% endif %}
+            {% if tiene_carreras %}
+            <a href="{% url 'listar_carreras' %}" class="boton boton-secundario">Carreras</a>
+            {% endif %}
+            {% if tiene_periodos %}
+            <a href="{% url 'listar_periodos' %}" class="boton boton-secundario">Periodos de nivelación</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if tiene_universidad %}
+    <div class="tarjeta">
+        <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 4px;">Usuarios institucionales</h2>
+        <p style="color: #5c6b73; margin-bottom: 16px; font-size: 13px; font-weight: bold;">Perfiles institucionales</p>
+        <div class="acciones" style="margin-bottom: 0;">
+            <a href="{% url 'listar_administrativos' %}" class="boton boton-secundario">Administrativos</a>
+            <a href="{% url 'listar_coordinadores_dan' %}" class="boton boton-secundario">Coordinadores de dirección de admisión y nivelación</a>
+            {% if tiene_carreras %}
+            <a href="{% url 'listar_coordinadores_ua' %}" class="boton boton-secundario">Coordinadores de unidades académicas</a>
+            <a href="{% url 'listar_docentes' %}" class="boton boton-secundario">Docentes</a>
+            {% endif %}
+            {% if tiene_periodos %}
+            <a href="{% url 'listar_estudiantes' %}" class="boton boton-secundario">Estudiantes</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if tiene_carreras %}
+    <div class="tarjeta">
+        <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 4px;">Estructura curricular</h2>
+        <p style="color: #5c6b73; margin-bottom: 16px; font-size: 13px; font-weight: bold;">Parámetros curriculares</p>
+        <div class="acciones" style="margin-bottom: 0;">
+            <a href="{% url 'listar_mallas' %}" class="boton boton-secundario">Mallas curriculares</a>
+            {% if tiene_mallas %}
+            <a href="{% url 'listar_unidades' %}" class="boton boton-secundario">Unidades curriculares</a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if tiene_periodos %}
+    {% if puede_procesar_mtn or tiene_consolidados %}
+    {% if estado_periodo != "SOLO_CERRADOS" %}
+    <div class="tarjeta">
+        <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 4px;">Matriz de Tercer Nivel</h2>
+        <p style="color: #5c6b73; margin-bottom: 16px; font-size: 13px; font-weight: bold;">Registro y resumen</p>
+        <div class="acciones" style="margin-bottom: 0;">
+            {% if puede_procesar_mtn %}
+            <a href="{% url 'procesar_mtn' %}" class="boton boton-secundario">Matriz de Tercer Nivel</a>
+            {% endif %}
+            {% if tiene_consolidados %}
+            <a href="{% url 'listar_consolidados' %}" class="boton boton-secundario">Resumen de ingreso</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if tiene_unidades %}
+    {% if estado_periodo != "SOLO_CERRADOS" %}
+    <div class="tarjeta">
+        <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 4px;">Conformación académica</h2>
+        <p style="color: #5c6b73; margin-bottom: 16px; font-size: 13px; font-weight: bold;">Distribución académica</p>
+        <div class="acciones" style="margin-bottom: 0;">
+            <a href="{% url 'listar_paralelos' %}" class="boton boton-secundario">Paralelos</a>
+            {% if tiene_horarios %}
+            <a href="{% url 'matriz_horarios' %}" class="boton boton-secundario">Horarios</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if puede_ver_informe %}
+    <div class="tarjeta">
+        <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 4px;">Evaluación académica</h2>
+        <p style="color: #5c6b73; margin-bottom: 16px; font-size: 13px; font-weight: bold;">Resultados de nivelación</p>
+        <div class="acciones" style="margin-bottom: 0;">
+            <a href="{% url 'informe_general' %}" class="boton boton-secundario">Informe de nivelación</a>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+    {% endif %}
+
+{% endblock %}
