@@ -185,3 +185,50 @@ class PerfilEstudiante(models.Model):
 
     def __str__(self):
         return f"ESTUDIANTE: {self.usuario_de_sistema.nombres} {self.usuario_de_sistema.apellidos}"
+
+
+# ══════════════════════════════════════════════════════════════
+# PERFIL ADMINISTRATIVO
+# ══════════════════════════════════════════════════════════════
+
+class PerfilAdministrativo(models.Model):
+    usuario_de_sistema = models.OneToOneField(
+        UsuarioDeSistema, on_delete=models.CASCADE,
+        related_name="perfil_administrativo", verbose_name="Usuario de sistema registrado"
+    )
+    universidad = models.ForeignKey(
+        'academico.Universidad', on_delete=models.SET_NULL,
+        related_name="administrativos", verbose_name="Universidad registrada",
+        null=True, blank=True
+    )
+    identificador_administrativo = models.CharField(
+        max_length=50, unique=True, verbose_name="Número de identificador administrativo"
+    )
+    perfil_administrativo = models.CharField(
+        max_length=100,
+        choices=cambiar_enum_a_choices(PerfilAdministrativo),
+        verbose_name="Perfil administrativo"
+    )
+    identificador_coordinador_dan = models.CharField(
+        max_length=50, null=True, blank=True, unique=True,
+        verbose_name="Número de identificador DAN"
+    )
+    identificador_coordinador_ua = models.CharField(
+        max_length=50, null=True, blank=True, unique=True,
+        verbose_name="Número de identificador UA"
+    )
+    unidad_academica = models.CharField(
+        max_length=200, null=True, blank=True, verbose_name="Unidad académica"
+    )
+    carrera_asignada = models.ForeignKey(
+        'academico.Carrera', on_delete=models.SET_NULL,
+        related_name="coordinadores_ua", verbose_name="Carrera asignada",
+        null=True, blank=True
+    )
+
+    class Meta:
+        verbose_name = "Perfil administrativo"
+        verbose_name_plural = "Perfiles administrativos"
+
+    def __str__(self):
+        return f"{self.perfil_administrativo.upper()}: {self.usuario_de_sistema.nombres} {self.usuario_de_sistema.apellidos}"
