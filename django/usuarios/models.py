@@ -91,7 +91,6 @@ class UsuarioDeSistema(AbstractBaseUser, PermissionsMixin):
         return f"{self.nombres} {self.apellidos} ({self.correo_institucional})"
 
 
-
 # ══════════════════════════════════════════════════════════════
 # PERFIL DOCENTE
 # ══════════════════════════════════════════════════════════════
