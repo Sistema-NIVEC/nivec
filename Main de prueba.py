@@ -3,66 +3,66 @@ from datetime import date, time
 # ─────────────────────────────────────────────
 # Enums
 # ─────────────────────────────────────────────
-from clases.enums.modalidad import Modalidad
-from clases.enums.tipo_de_identificacion import TipoDeIdentificacion
-from clases.enums.perfil_administrativo import PerfilAdministrativo
-from clases.enums.tipo_de_vinculacion import TipoDeVinculacion
-from clases.enums.tiempo_de_dedicacion import TiempoDeDedicacion
-from clases.enums.jornada import Jornada
-from clases.enums.registro_de_cupo import RegistroDeCupo
-from clases.enums.estado_de_matricula import EstadoDeMatricula
-from clases.enums.tipo_de_componente import TipoDeComponente
-from clases.enums.dia_de_semana import DiaDeSemana
-from clases.enums.tipo_de_sesion import TipoDeSesion
-from clases.enums.tipo_de_cohorte import TipoDeCohorte
-from clases.enums.tipo_de_informe import TipoDeInforme
-from clases.enums.formato_de_exportacion import FormatoDeExportacion
-from clases.enums.estado_de_periodo import EstadoDePeriodo
-from clases.enums.estado_de_alerta import EstadoDeAlerta
-from clases.enums.estado_de_malla import EstadoDeMalla
+from poo.clases.enums.modalidad import Modalidad
+from poo.clases.enums.tipo_de_identificacion import TipoDeIdentificacion
+from poo.clases.enums.perfil_administrativo import PerfilAdministrativo
+from poo.clases.enums.tipo_de_vinculacion import TipoDeVinculacion
+from poo.clases.enums.tiempo_de_dedicacion import TiempoDeDedicacion
+from poo.clases.enums.jornada import Jornada
+from poo.clases.enums.registro_de_cupo import RegistroDeCupo
+from poo.clases.enums.estado_de_matricula import EstadoDeMatricula
+from poo.clases.enums.tipo_de_componente import TipoDeComponente
+from poo.clases.enums.dia_de_semana import DiaDeSemana
+from poo.clases.enums.tipo_de_sesion import TipoDeSesion
+from poo.clases.enums.tipo_de_cohorte import TipoDeCohorte
+from poo.clases.enums.tipo_de_informe import TipoDeInforme
+from poo.clases.enums.formato_de_exportacion import FormatoDeExportacion
+from poo.clases.enums.estado_de_periodo import EstadoDePeriodo
+from poo.clases.enums.estado_de_alerta import EstadoDeAlerta
+from poo.clases.enums.estado_de_malla import EstadoDeMalla
 
 # ─────────────────────────────────────────────
 # Clases del dominio
 # ─────────────────────────────────────────────
-from clases.universidad import Universidad
-from clases.campus import Campus
-from clases.carrera import Carrera
-from clases.malla_curricular import MallaCurricular
-from clases.unidad_curricular import UnidadCurricular
-from clases.periodo_de_nivelacion import PeriodoDeNivelacion
-from clases.paralelo import Paralelo
-from clases.horario import Horario
-from clases.cohorte_de_matricula import CohorteDeMatricula
-from clases.consolidado_academico import ConsolidadoAcademico
-from clases.evaluacion_academica import EvaluacionAcademica
-from clases.evaluacion_de_desempeno import EvaluacionDeDesempeno
-from clases.incidencia_academica import IncidenciaAcademica
-from clases.informe_general import InformeGeneral
+from poo.clases.universidad import Universidad
+from poo.clases.campus import Campus
+from poo.clases.carrera import Carrera
+from poo.clases.malla_curricular import MallaCurricular
+from poo.clases.unidad_curricular import UnidadCurricular
+from poo.clases.periodo_de_nivelacion import PeriodoDeNivelacion
+from poo.clases.paralelo import Paralelo
+from poo.clases.horario import Horario
+from poo.clases.cohorte_de_matricula import CohorteDeMatricula
+from poo.clases.consolidado_academico import ConsolidadoAcademico
+from poo.clases.evaluacion_academica import EvaluacionAcademica
+from poo.clases.evaluacion_de_desempeno import EvaluacionDeDesempeno
+from poo.clases.incidencia_academica import IncidenciaAcademica
+from poo.clases.informe_general import InformeGeneral
 
 # ─────────────────────────────────────────────
 # Usuarios
 # ─────────────────────────────────────────────
-from clases.usuarios.usuario_administrativo import UsuarioAdministrativo
-from clases.usuarios.docente import Docente
-from clases.usuarios.estudiante import Estudiante
-from clases.usuarios.coordinador_dan import CoordinadorDAN
-from clases.usuarios.coordinador_unidad_academica import CoordinadorUnidadAcademica
+from poo.clases.usuarios.usuario_administrativo import UsuarioAdministrativo
+from poo.clases.usuarios.docente import Docente
+from poo.clases.usuarios.estudiante import Estudiante
+from poo.clases.usuarios.coordinador_dan import CoordinadorDAN
+from poo.clases.usuarios.coordinador_unidad_academica import CoordinadorUnidadAcademica
 
 # ─────────────────────────────────────────────
 # Servicios
 # ─────────────────────────────────────────────
-from clases.servicios.distribuidor_de_estudiantes import DistribuidorDeEstudiantes
-from clases.servicios.procesador_de_informe import ProcesadorDeInforme
-from clases.servicios.monitor_normativo import MonitorNormativo
-from clases.servicios.estrategia_de_evaluacion_estandar import EstrategiaDeEvaluacionEstandar
-from clases.servicios.depurador_de_sincronizacion import DepuradorDeSincronizacion
+from poo.clases.servicios.distribuidor_de_estudiantes import DistribuidorDeEstudiantes
+from poo.clases.servicios.procesador_de_informe import ProcesadorDeInforme
+from poo.clases.servicios.monitor_normativo import MonitorNormativo
+from poo.clases.servicios.estrategia_de_evaluacion_estandar import EstrategiaDeEvaluacionEstandar
+from poo.clases.servicios.depurador_de_sincronizacion import DepuradorDeSincronizacion
 
 # ─────────────────────────────────────────────
 # Criterios filtro
 # ─────────────────────────────────────────────
-from clases.criterios_filtro.criterio_cedula_formato import CriterioCedulaFormato
-from clases.criterios_filtro.criterio_consistente_de_horas import CriterioConsistentesDeHoras
-from clases.criterios_filtro.criterio_de_periodo_valido import CriterioPeriodoValido
+from poo.clases.criterios_filtro.criterio_cedula_formato import CriterioCedulaFormato
+from poo.clases.criterios_filtro.criterio_consistente_de_horas import CriterioConsistentesDeHoras
+from poo.clases.criterios_filtro.criterio_de_periodo_valido import CriterioPeriodoValido
 
 
 # ══════════════════════════════════════════════════════════════
@@ -298,7 +298,7 @@ resultado("Login docente activo", docente_1.iniciar_sesion())
 docente_1.inhabilitar_perfil()
 resultado("Login docente inactivo", docente_1.iniciar_sesion())
 docente_1._estado_de_vinculacion.__class__  # reactivar para pruebas
-from clases.enums.estado_de_vinculacion import EstadoDeVinculacion
+from poo.clases.enums.estado_de_vinculacion import EstadoDeVinculacion
 docente_1._estado_de_vinculacion = EstadoDeVinculacion.ACTIVO
 
 sub("4d. Coordinador de Unidad Académica (Herencia múltiple)")
