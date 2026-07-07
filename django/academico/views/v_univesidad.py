@@ -1,0 +1,99 @@
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from usuarios.utils import requiere_perfil, usuario_es_solo_lectura, ROL_DIRECTOR_DAN, ROL_COORDINADOR_DAN, ROL_COORDINADOR_UA, ROL_RECTOR, ROL_VICERRECTOR, ROL_DOCENTE, ROL_ESTUDIANTE
+from academico.forms import FormularioUniversidad
+
+@requiere_perfil(ROL_DIRECTOR_DAN, ROL_COORDINADOR_DAN, ROL_COORDINADOR_UA, ROL_RECTOR, ROL_VICERRECTOR, ROL_DOCENTE, ROL_ESTUDIANTE)
+def detalle_universidad(request):
+    # Obtener universidad desde cualquier tipo de perfil
+    perfil_admin = getattr(request.user, 'perfil_administrativo', None)
+    perfil_docente = getattr(request.user, 'perfil_docente', None)
+    
+    universidad = None
+    if perfil_admin:
+        universidad = perfil_admin.universidad
+    elif perfil_docente:
+        universidad = perfil_docente.universidad
+    else:
+        from usuarios.models import PerfilEstudiante
+        perfil_est = PerfilEstudiante.objects.filter(usuario_de_sistema=request.user).first()
+        if perfil_est and perfil_est.carrera_registrada:
+            universidad = perfil_est.carrera_registrada.campus.universidad
+
+    if not universidad:
+        return redirect("panel_principal")
+
+    from usuarios.utils import obtener_rol_usuario
+    rol = obtener_rol_usuario(request.user)
+    solo_lectura = rol in (ROL_RECTOR, ROL_VICERRECTOR, ROL_COORDINADOR_DAN, ROL_COORDINADOR_UA, ROL_DOCENTE, ROL_ESTUDIANTE)
+
+    from academico.permisos import obtener_permisos_periodo
+    permisos = obtener_permisos_periodo(universidad)
+
+    return render(request, "entidades/detalle_universidad.html", {
+        "universidad": universidad,
+        "titulo_pagina": "Institución - NIVEC",
+        "solo_lectura": solo_lectura,
+        "puede_modificar_universidad": permisos["puede_modificar_universidad"] and rol == ROL_DIRECTOR_DAN,
+    })
+
+@requiere_perfil(ROL_DIRECTOR_DAN)
+def registrar_universidad(request):
+    from academico.models import Universidad
+    if request.user.perfil_administrativo.universidad:
+        return redirect("panel_principal")
+    
+    if Universidad.objects.exists():
+        universidad_existente = Universidad.objects.first()
+        perfil = request.user.perfil_administrativo
+        perfil.universidad = universidad_existente
+        perfil.save()
+        messages.warning(request, "La Institución ya ha sido registrada")
+        return redirect("detalle_universidad")
+
+    if request.method == "POST":
+        formulario_universidad = FormularioUniversidad(request.POST, request.FILES)
+        if formulario_universidad.is_valid():
+            nueva_universidad = formulario_universidad.save()
+            perfil = request.user.perfil_administrativo
+            perfil.universidad = nueva_universidad
+            perfil.save()
+            
+            messages.success(request, "La Institución ha sido registrada correctamente")
+            return redirect("panel_principal")
+    else:
+        formulario_universidad = FormularioUniversidad()
+        
+    return render(request, "entidades/formulario_universidad.html", {
+        "formulario": formulario_universidad,
+        "titulo_pagina": "Institución - NIVEC",
+        "titulo": "Registrar Institución",
+        "boton_texto": "Registrar",
+        "url_cancelar": "panel_principal",
+        "mostrar_carga_masiva": False
+    })
+
+@requiere_perfil(ROL_DIRECTOR_DAN)
+def modificar_universidad(request):
+    universidad_usuario = request.user.perfil_administrativo.universidad
+    if not universidad_usuario:
+        messages.warning(request, "La Institución no ha sido registrada actualmente")
+        return redirect("registrar_universidad")
+
+    if request.method == "POST":
+        formulario = FormularioUniversidad(request.POST, request.FILES, instance=universidad_usuario)
+        if formulario.is_valid():
+            formulario.save()
+            messages.success(request, "La Institución ha sido modificada correctamente")
+            return redirect("detalle_universidad")
+    else:
+        formulario = FormularioUniversidad(instance=universidad_usuario)
+        
+    return render(request, "entidades/formulario_universidad.html", {
+        "formulario": formulario,
+        "titulo_pagina": "Institución - NIVEC",
+        "titulo": "Modificar Institución",
+        "boton_texto": "Modificar",
+        "url_cancelar": "detalle_universidad",
+        "mostrar_carga_masiva": False
+    })
