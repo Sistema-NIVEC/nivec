@@ -431,3 +431,226 @@ def servicio_unidad_registrar_masivo_desde_excel(archivo, universidad_usuario):
         resultado["error"] = "Ha ocurrido un error al procesar el documento"
 
     return resultado
+
+def servicio_generar_paralelos(periodo_db, capacidad=35):
+    import math
+    from poo.clases.paralelo import Paralelo as ParaleloBase
+    from poo.clases.servicios.centro_de_operacion_academica import CentroDeOperacionAcademica
+    from poo.clases.cohorte_de_matricula import CohorteDeMatricula as CohorteDeMatriculaPOO
+    from poo.clases.enums.jornada import Jornada
+    from poo.clases.enums.modalidad import Modalidad as EnumModalidad
+    from poo.clases.enums.estado_de_malla import EstadoDeMalla
+    from poo.clases.enums.registro_de_cupo import RegistroDeCupo
+    from poo.clases.enums.tipo_de_cohorte import TipoDeCohorte
+
+    resumen = {
+        "grupos_creados": 0,
+        "paralelos_creados": 0,
+        "estudiantes_distribuidos": 0,
+        "advertencias": [],
+    }
+
+    try:
+        capacidad = int(capacidad)
+    except (TypeError, ValueError):
+        capacidad = 35
+    if capacidad <= 0:
+        capacidad = 35
+
+    universidad = periodo_db.universidad
+    facade = CentroDeOperacionAcademica()
+    enum_modalidad = obtener_enum_flexible(EnumModalidad, periodo_db.modalidad)
+
+    import re
+
+    def _num_sufijo(cadena):
+        coincidencia = re.search(r"(\d+)$", str(cadena or ""))
+        return int(coincidencia.group(1)) if coincidencia else 0
+
+    contador_codigo = max(
+        [_num_sufijo(c) for c in Paralelo.objects.values_list("codigo_de_paralelo", flat=True).distinct()] or [0],
+        default=0,
+    )
+
+    carreras = Carrera.objects.filter(campus__universidad=universidad)
+
+    for carrera in carreras:
+        malla = MallaCurricular.objects.filter(
+            carrera=carrera, estado=EstadoDeMalla.ACTIVA.value
+        ).first()
+        if not malla:
+            if PerfilEstudiante.objects.filter(
+                carrera_registrada=carrera,
+                periodo_de_nivelacion=periodo_db,
+                estado_de_matricula=EstadoDeMatricula.MATRICULADO.value,
+            ).exists():
+                resumen["advertencias"].append(
+                    f"La Carrera {carrera.nombre} tiene estudiantes registrados pero no cuenta con una Malla curricular activa"
+                )
+            continue
+
+        unidades = list(malla.unidades_curriculares.all())
+        if not unidades:
+            resumen["advertencias"].append(
+                f"Los registros en la Carrera {carrera.nombre} fueron omitidos (sin registros asociados)"
+            )
+            continue
+
+        jornadas_presentes = (
+            PerfilEstudiante.objects.filter(
+                carrera_registrada=carrera, periodo_de_nivelacion=periodo_db
+            )
+            .values_list("jornada", flat=True).distinct()
+        )
+
+
+        for jornada_valor in jornadas_presentes:
+            estudiantes = list(
+                PerfilEstudiante.objects.filter(
+                    carrera_registrada=carrera,
+                    jornada=jornada_valor,
+                    periodo_de_nivelacion=periodo_db,
+                    estado_de_matricula=EstadoDeMatricula.MATRICULADO.value,
+                ).exclude(
+                    estudiantes_matriculados__paralelo__periodo_de_nivelacion=periodo_db
+                ).distinct()
+            )
+            if not estudiantes:
+                continue
+
+            try:
+                enum_jornada = obtener_enum_flexible(Jornada, jornada_valor)
+            except ValueError:
+                resumen["advertencias"].append(
+                    f"El registro de Jornada fue omitido (registro no válido)"
+                )
+                continue
+
+            cohorte = _obtener_o_crear_cohorte(periodo_db, carrera)
+            estudiantes_a_contar = []
+
+            def _numero_de_grupo(nombre):
+                try:
+                    return int(str(nombre).split()[-1])
+                except (ValueError, IndexError):
+                    return 0
+
+            with transaction.atomic():
+                paralelos_existentes = Paralelo.objects.filter(
+                    periodo_de_nivelacion=periodo_db,
+                    jornada=jornada_valor,
+                    unidad_curricular__in=unidades,
+                )
+                grupos_existentes = {}
+                for paralelo_db in paralelos_existentes:
+                    grupos_existentes.setdefault(paralelo_db.nombre, []).append(paralelo_db)
+
+                indice_max = 0
+                indice_pendiente = 0
+
+                for nombre_grupo in sorted(grupos_existentes.keys(), key=_numero_de_grupo):
+                    paralelos_grupo = grupos_existentes[nombre_grupo]
+                    indice_max = max(indice_max, _numero_de_grupo(nombre_grupo))
+
+                    representativo = paralelos_grupo[0]
+                    ocupacion = MatriculaParalelo.objects.filter(paralelo=representativo).count()
+                    cupo_libre = representativo.capacidad_maxima - ocupacion
+                    if cupo_libre <= 0:
+                        continue
+
+                    a_matricular = estudiantes[indice_pendiente:indice_pendiente + cupo_libre]
+                    indice_pendiente += len(a_matricular)
+
+                    for paralelo_db in paralelos_grupo:
+                        for estudiante_db in a_matricular:
+                            MatriculaParalelo.objects.create(
+                                estudiante=estudiante_db,
+                                paralelo=paralelo_db,
+                                cohorte_de_matricula=cohorte,
+                            )
+                    estudiantes_a_contar.extend(a_matricular)
+
+                estudiantes_restantes = estudiantes[indice_pendiente:]
+                if estudiantes_restantes:
+                    # Calcular el siguiente índice de letra basado en el nombre más alto existente
+                    # para evitar repetir códigos cuando se eliminan paralelos.
+                    nombres_existentes = list(
+                        Paralelo.objects.filter(
+                            periodo_de_nivelacion=periodo_db,
+                            unidad_curricular__malla_curricular__carrera=carrera,
+                        ).values_list("nombre", flat=True).distinct()
+                    )
+                    # Encontrar el índice más alto de los nombres existentes
+                    indice_base = 0
+                    for nombre_existente in nombres_existentes:
+                        # Parsear "Paralelo X" donde X es una letra como A, B, ..., Z, A1, B1...
+                        nombre_limpio = nombre_existente.replace("Paralelo ", "").strip()
+                        if len(nombre_limpio) == 1 and nombre_limpio.isalpha():
+                            idx = ord(nombre_limpio.upper()) - ord('A') + 1
+                        elif len(nombre_limpio) >= 2 and nombre_limpio[0].isalpha() and nombre_limpio[1:].isdigit():
+                            idx = 26 + (int(nombre_limpio[1:]) - 1) * 26 + (ord(nombre_limpio[0].upper()) - ord('A')) + 1
+                        else:
+                            idx = 0
+                        indice_base = max(indice_base, idx)
+
+                    numero_de_grupos = math.ceil(len(estudiantes_restantes) / capacidad)
+                    grupos_poo = [
+                        ParaleloBase(
+                            codigo_de_paralelo=f"G{indice}",
+                            nombre=_nombre_paralelo_letra(indice_base + indice - 1),
+                            jornada=enum_jornada,
+                            modalidad=enum_modalidad,
+                            capacidad_maxima=capacidad,
+                        )
+                        for indice in range(1, numero_de_grupos + 1)
+                    ]
+
+                    facade.distribuir_estudiantes(grupos_poo, estudiantes_restantes)
+
+                    for indice, grupo_poo in enumerate(grupos_poo, start=1):
+                        miembros = list(grupo_poo._estudiantes_matriculados)
+                        if not miembros:
+                            continue
+                        nombre_nuevo = _nombre_paralelo_letra(indice_base + indice - 1)
+                        contador_codigo += 1
+                        codigo_nuevo = f"PAR{contador_codigo:03d}"
+                        for unidad in unidades:
+                            paralelo_db = Paralelo.objects.create(
+                                periodo_de_nivelacion=periodo_db,
+                                unidad_curricular=unidad,
+                                codigo_de_paralelo=codigo_nuevo,
+                                nombre=nombre_nuevo,
+                                jornada=jornada_valor,
+                                modalidad=periodo_db.modalidad,
+                                capacidad_maxima=capacidad,
+                            )
+                            resumen["paralelos_creados"] += 1
+                            for estudiante_db in miembros:
+                                MatriculaParalelo.objects.create(
+                                    estudiante=estudiante_db,
+                                    paralelo=paralelo_db,
+                                    cohorte_de_matricula=cohorte,
+                                )
+                        resumen["grupos_creados"] += 1
+                        estudiantes_a_contar.extend(miembros)
+
+                cohorte_poo = CohorteDeMatriculaPOO(
+                    codigo_de_registro=cohorte.codigo_de_registro,
+                    nombre_cohorte=cohorte.nombre_cohorte,
+                    carrera_registrada=None,
+                    fecha_de_cierre=periodo_db.fecha_fin,
+                    periodo_de_nivelacion=None,
+                    tipo_de_cohorte=obtener_enum_flexible(TipoDeCohorte, cohorte.tipo_de_cohorte),
+                )
+                for estudiante_db in estudiantes_a_contar:
+                    cohorte_poo.registrar_estudiante_matriculado(estudiante_db)
+
+                estadisticas_cohorte = cohorte_poo.obtener_estadisticas_de_registro()
+                cohorte.total_primera_matricula += estadisticas_cohorte["Total primera matricula"]
+                cohorte.total_segunda_matricula += estadisticas_cohorte["Total segunda matricula"]
+                cohorte.total_exonerados += estadisticas_cohorte["Total exonerados"]
+                resumen["estudiantes_distribuidos"] += len(estudiantes_a_contar)
+
+                cohorte.save()
+
+    return resumen
