@@ -1,9 +1,7 @@
-#Enums
 from poo.clases.enums.jornada import Jornada
 from poo.clases.enums.registro_de_cupo import RegistroDeCupo
 from poo.clases.enums.estado_de_matricula import EstadoDeMatricula
 
-#Herencia
 from poo.clases.usuarios.usuario_academico import UsuarioAcademico
 
 
@@ -25,43 +23,62 @@ class Estudiante(UsuarioAcademico):
             identificador_institucional = identificador_institucional,
             **kwargs
         )
-        self.numero_de_matricula = numero_de_matricula
-        self.jornada = jornada #Instancia de Enum
-        self.registro_de_cupo = registro_de_cupo #Instancia de Enum
-        self.carrera_registrada = carrera_registrada
-        self.campus_registrado = campus_registrado
-        self._estado_de_matricula = estado_de_matricula #Instancia de Enum
-     
-     
-    def iniciar_sesion(self): #Sobreescritura
+        self._numero_de_matricula = numero_de_matricula
+        self._jornada = jornada #Instancia de Enum
+        self._registro_de_cupo = registro_de_cupo #Instancia de Enum
+        self._carrera_registrada = carrera_registrada
+        self._campus_registrado = campus_registrado
+        self._estado_de_matricula = EstadoDeMatricula.MATRICULADO #Instancia de Enum
+
+
+    @property
+    def numero_de_matricula(self):
+        return self._numero_de_matricula
+
+    @property
+    def jornada(self):
+        return self._jornada
+
+    @property
+    def registro_de_cupo(self):
+        return self._registro_de_cupo
+
+    @property
+    def carrera_registrada(self):
+        return self._carrera_registrada
+
+    @property
+    def campus_registrado(self):
+        return self._campus_registrado
+
+    @property
+    def estado_de_matricula(self):
+        return self._estado_de_matricula
+
+
+    def validar_datos_de_registro(self) -> dict:
+        errores = {}
+        if not self._jornada:
+            errores["jornada"] = "Información requerida"
+        if not self._registro_de_cupo:
+            errores["registro_de_cupo"] = "Información requerida"
+        if not self._carrera_registrada:
+            errores["carrera_registrada"] = "Información requerida"
+        return errores
+
+
+    def iniciar_sesion(self):
         if self._estado_de_matricula in (EstadoDeMatricula.RETIRADO, EstadoDeMatricula.ANULADO):
             return False
         return True
     
+    def formalizar_matricula(self):
+        self._estado_de_matricula = EstadoDeMatricula.MATRICULADO
     
-    def formalizar_matricula(self): #ASPIRANTE a MATRICULADO
-        if self._estado_de_matricula == EstadoDeMatricula.ASPIRANTE:
-            self._estado_de_matricula = EstadoDeMatricula.MATRICULADO
-            return True
-        return False
-            
-            
     def anular_matricula(self):
         self._estado_de_matricula = EstadoDeMatricula.ANULADO
             
-            
-    def obtener_carrera(self):
-        return self.carrera_registrada
-    
-    
-    def solicitar_retiro(self): #A RETIRADO si está MATRICULADO
-        if self._estado_de_matricula == EstadoDeMatricula.MATRICULADO:
-            self._estado_de_matricula = EstadoDeMatricula.RETIRADO
-            return True
-        return False
-    
-    
-    def aprobar_retiro(self):
+    def solicitar_retiro(self):
         if self._estado_de_matricula == EstadoDeMatricula.MATRICULADO:
             self._estado_de_matricula = EstadoDeMatricula.RETIRADO
             return True
