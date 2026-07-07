@@ -106,3 +106,4 @@ class PerfilEstudianteAdmin(admin.ModelAdmin):
                 "jornada"
             )
         }),
+    )
