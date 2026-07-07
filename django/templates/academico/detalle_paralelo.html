@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ titulo_pagina|default:"NIVEC" }}{% endblock %}
+
+{% block contenido %}
+<style>
+    .tarjeta table th, .tarjeta table td { padding: 12px 24px; white-space: nowrap; }
+    .etiqueta-accion {
+        padding: 6px 14px; border-radius: 6px; font-size: 12px; text-decoration: none;
+        display: inline-block; font-weight: bold; margin-right: 6px; transition: all 0.2s ease;
+        border: none; cursor: pointer;
+    }
+    .etiqueta-accion:last-child { margin-right: 0; }
+    .etiqueta-modificar { background: #5c6b73; color: white; }
+    .etiqueta-modificar:hover { opacity: 0.85; }
+    .etiqueta-naranja { background: #9db4c0; color: white; }
+    .etiqueta-naranja:hover { opacity: 0.85; }
+    .etiqueta-eliminar { background: #253237; color: white; }
+    .etiqueta-eliminar:hover { opacity: 0.85; }
+</style>
+
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
+    <div>
+        <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 4px; color: #253237;">{{ titulo }}</h2>
+        <p style="color: #5c6b73; font-size: 13px; font-weight: bold; margin: 0;">
+            {{ representativo.codigo_de_paralelo }} ({{ representativo.periodo_de_nivelacion.periodo }})
+        </p>
+    </div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <a href="{% url 'listar_horarios_paralelo' representativo.id %}" class="boton boton-primario">{% if puede_configurar_horario %}Configurar Horario{% else %}Horario{% endif %}</a>
+    </div>
+</div>
+
+<div style="margin-bottom: 16px;">
+    <a href="{% url 'descargar_info_paralelo' representativo.id %}" style="color: #253237; font-size: 13px; font-weight: bold; text-decoration: none;">Descargar información registrada</a>
+</div>
+
+<div class="tarjeta" style="padding: 0; overflow-x: auto;">
+    <table style="width: 100%;">
+        <thead>
+            <tr>
+                <th style="font-weight: bold; text-align: left; color: #5c6b73">Código de Unidad curricular</th>
+                <th style="font-weight: bold; text-align: left; color: #5c6b73">Nombre</th>
+                <th style="font-weight: bold; text-align: left; color: #5c6b73">Docente designado</th>
+                <th style="font-weight: bold; text-align: left; color: #5c6b73">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in unidades %}
+            <tr>
+                <td style="font-family: monospace; text-align: left; color: #1d1d1f;">{{ u.unidad_curricular.codigo_de_unidad }}</td>
+                <td style="text-align: left; color: #1d1d1f;">{{ u.unidad_curricular.nombre }}</td>
+                <td style="text-align: left; color: #1d1d1f;">
+                    {% if u.docente_responsable %}
+                        {{ u.docente_responsable.usuario_de_sistema.nombres }} {{ u.docente_responsable.usuario_de_sistema.apellidos }}
+                    {% else %}
+                        <span style="color: #9db4c0;">Sin designación actualmente</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: left; white-space: nowrap;">
+                    {% if puede_designar_docente and not solo_lectura and tiene_horario %}
+                    <a href="{% url 'asignar_docente_paralelo' u.id %}" class="etiqueta-accion etiqueta-naranja">Designación Docente</a>
+                    {% endif %}
+                    <a href="{% url 'listar_estudiantes_paralelo' u.id %}" class="etiqueta-accion etiqueta-naranja">Estudiantes registrados</a>
+                    {% if es_evaluacion_o_cerrado %}
+                    <a href="{% url 'listar_evaluaciones_paralelo' u.id %}" class="etiqueta-accion etiqueta-naranja">Registro de calificaciones</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" style="text-align: center; color: #9db4c0; padding: 30px;">
+                    No existen registros actualmente
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div style="margin-top: 15px;">
+    <a href="{% url 'listar_paralelos' %}" class="boton boton-secundario">Volver</a>
+</div>
+{% endblock %}

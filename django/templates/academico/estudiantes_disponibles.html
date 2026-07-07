@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ titulo_pagina|default:"NIVEC" }}{% endblock %}
+
+{% block contenido %}
+<style>
+    .tarjeta table th, .tarjeta table td { 
+        padding: 12px 24px; 
+        white-space: nowrap; 
+        font-family: inherit;
+    }
+    .etiqueta-accion {
+        padding: 6px 14px; 
+        border-radius: 6px; 
+        font-size: 12px; 
+        font-weight: bold;
+        border: none; 
+        cursor: pointer; 
+        text-decoration: none; 
+        display: inline-block;
+        font-family: inherit;
+        transition: all 0.2s ease;
+    }
+    .etiqueta-naranja { background: #9db4c0; color: white; border: none; }
+    .etiqueta-naranja:hover { opacity: 0.85; }
+</style>
+
+<div style="font-family: inherit;">
+    <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 4px; color: #253237; font-family: inherit;">{{ titulo }}</h2>
+    <p style="color: #5c6b73; font-size: 13px; font-weight: bold; margin-bottom: 20px; font-family: inherit;">
+        Periddo de nivelación ({{ paralelo.periodo_de_nivelacion.periodo }}). {{ paralelo.unidad_curricular.malla_curricular.carrera.nombre }} (Jornada {{ paralelo.get_jornada_display }}) &middot; {{ ocupacion }}/{{ capacidad }} Estudiantes registrados
+    </p>
+</div>
+
+{% if lleno %}
+<div class="tarjeta" style="font-family: inherit;">
+    <p style="color: #5c6b73; font-size: 13px; font-weight: bold; margin: 0; font-family: inherit;">El Paralelo no presenta cupos disponibles.</p>
+</div>
+{% else %}
+<div class="tarjeta" style="padding: 0; overflow-x: auto; font-family: inherit;">
+    <table style="width: 100%;">
+        <thead>
+            <tr>
+                <th style="font-weight: bold; text-align: left; color: #5c6b73">Tipo de identificación</th>
+                <th style="font-weight: bold; text-align: left; color: #5c6b73">Número de identificación</th>
+                <th style="font-weight: bold; text-align: left; color: #5c6b73">Apellidos</th>
+                <th style="font-weight: bold; text-align: left; color: #5c6b73">Nombres</th>
+                <th style="font-weight: bold; text-align: left; color: #5c6b73">Correo institucional</th>
+                <th style="font-weight: bold; text-align: left; color: #5c6b73">Número de matrícula</th>
+                <th style="font-weight: bold; text-align: left; color: #5c6b73">Registro de cupo</th>
+                <th style="font-weight: bold; text-align: left; color: #5c6b73">Estado de matrícula</th>
+                <th style="font-weight: bold; text-align: left; color: #5c6b73">Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in no_asignados %}
+            <tr>
+                <td style="text-align: left; color: #1d1d1f;">{{ e.usuario_de_sistema.tipo_de_identificacion }}</td>
+                <td style="font-family: monospace; text-align: left; color: #1d1d1f;">{{ e.usuario_de_sistema.identificacion }}</td>
+                <td style="text-align: left; color: #1d1d1f;">{{ e.usuario_de_sistema.apellidos }}</td>
+                <td style="text-align: left; color: #1d1d1f;">{{ e.usuario_de_sistema.nombres }}</td>
+                <td style="text-align: left; color: #1d1d1f;">{{ e.usuario_de_sistema.correo_institucional }}</td>
+                <td style="text-align: left; color: #1d1d1f;">{{ e.numero_de_matricula }}</td>
+                <td style="text-align: left; color: #1d1d1f;">{{ e.get_registro_de_cupo_display }}</td>
+                <td style="text-align: left; color: #1d1d1f;">{{ e.get_estado_de_matricula_display }}</td>
+                <td style="text-align: left; white-space: nowrap;">
+                    <form method="post" action="{% url 'agregar_estudiante' paralelo.id %}" style="margin: 0; font-family: inherit;">
+                        {% csrf_token %}
+                        <input type="hidden" name="estudiante" value="{{ e.id }}">
+                        <button type="submit" class="etiqueta-accion etiqueta-naranja">Incorporar</button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="9" style="text-align: center; color: #9db4c0; padding: 30px; font-family: inherit;">
+                    No existen estudiantes sin asignar para esta Carrera y Jornada actualmente
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<div style="margin-top: 15px; font-family: inherit;">
+    <a href="{% url 'listar_estudiantes_paralelo' paralelo.id %}" class="boton boton-secundario">Volver</a>
+</div>
+{% endblock %}
