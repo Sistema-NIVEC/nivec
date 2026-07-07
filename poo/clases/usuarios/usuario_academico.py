@@ -1,4 +1,3 @@
-#Herencia
 from poo.clases.usuarios.usuario_de_sistema import UsuarioDeSistema
 
 
@@ -21,15 +20,5 @@ class UsuarioAcademico(UsuarioDeSistema):
         )
         self.identificador_institucional = identificador_institucional
         
-        
     def iniciar_sesion(self):
         return True
-        
-        
-    def obtener_registro_institucional(self):
-        return {
-            "Identificador institucional": self.identificador_institucional,
-            "Nombres": self.nombres,
-            "Apellidos": self.apellidos,
-            "Correo institucional": self.correo_institucional,
-        }
