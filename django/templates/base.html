@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block titulo %}NIVEC{% endblock %}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            font-size: 14px; 
+            background: #F4F4F4; 
+            color: #253237; 
+        }
+
+        nav { 
+            background: #253237; 
+            color: white; 
+            padding: 14px 24px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+        nav .marca { font-weight: 600; font-size: 16px; letter-spacing: -0.01em; color: white; text-decoration: none; }
+        nav a { color: #DADBDB; text-decoration: none; margin-left: 16px; font-size: 13px; }
+        nav a:hover { color: white; }
+
+        .contenedor { max-width: 1000px; margin: 32px auto; padding: 0 16px; }
+
+        .tarjeta { 
+            background: white; 
+            border-radius: 8px; 
+            padding: 24px; 
+            margin-bottom: 20px; 
+            border: 1px solid #DADBDB; /* Actualizado a DADBDB */
+        }
+        .tarjeta h2 { 
+            margin-bottom: 16px; 
+            font-size: 16px; 
+            font-weight: 600; 
+            color: #253237; 
+        }
+
+        .mensajes { margin-bottom: 16px; }
+        .mensaje { 
+            padding: 8px 14px; 
+            border-radius: 8px; 
+            margin-bottom: 8px; 
+            font-size: 13px;
+            font-weight: bold;
+            background: transparent; 
+            border: none;
+        }
+
+        /* Éxito */
+        .mensaje.exito { 
+            color: #5c6b73; 
+        }
+
+        /* Error */
+        .mensaje.error { 
+            color: #B22222; 
+        }
+
+        /* Aviso e Info */
+        .mensaje.aviso, .mensaje.info { 
+            color: #9db4c0; 
+        }
+
+        .campo { margin-bottom: 14px; }
+        .campo label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px; color: #253237; }
+        .campo input, .campo select, .campo textarea {
+            width: 100%; 
+            padding: 10px 12px; 
+            border: 1px solid #DADBDB; /* Actualizado a DADBDB */
+            border-radius: 8px; 
+            font-size: 13px;
+            background: white;
+            color: #253237; 
+            outline: none;
+            font-family: inherit;
+        }
+        .campo input:focus, .campo select:focus, .campo textarea:focus {
+            border-color: #253237; 
+        }
+        .campo .ayuda { font-size: 13px; color: #9db4c0; margin-top: 3px; } 
+        .campo .error-campo { font-size: 13px; color: #B22222; margin-top: 3px; }
+
+        .boton { 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 13px; 
+            font-weight: 500;
+            text-decoration: none; 
+            display: inline-block;
+            font-family: inherit;
+            text-align: center;
+            line-height: 1.5;
+        }
+        .boton-primario { background: #253237; color: white; }
+        .boton-primario:hover { background: #5c6b73; }
+        .boton-secundario { background: #e8e8ed; color: #253237; }
+        .boton-secundario:hover { background: #d1d1d6; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { color: #9db4c0; font-weight: 600; padding: 12px; text-align: left; border-bottom: 1px solid #DADBDB; } /* Actualizado a DADBDB */
+        td { padding: 12px; border-bottom: 1px solid #F4F4F4; color: #253237; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #fafafa; }
+
+        .acciones { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+
+{% if user.is_authenticated %}
+{% block navbar %}
+<nav>
+    <a href="{% url 'panel_principal' %}" class="marca">NIVEC</a>
+    <div>
+        <a href="{% url 'modificar_perfil' %}">
+            {{ user.nombres }} {{ user.apellidos }}
+        </a>
+        <a href="{% url 'cerrar_sesion' %}">Cerrar sesión</a>
+    </div>
+</nav>
+{% endblock %}
+{% endif %}
+
+<div class="contenedor">
+    {% if messages %}
+    <div class="mensajes">
+        {% for mensaje in messages %}
+        <div class="mensaje
+            {% if mensaje.tags == 'success' %}exito
+            {% elif mensaje.tags == 'error' %}error
+            {% elif mensaje.tags == 'info' %}info
+            {% else %}aviso{% endif %}">
+            {{ mensaje }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if formulario.non_field_errors %}
+    <div class="mensajes">
+        {% for error in formulario.non_field_errors %}
+        <div class="mensaje error">
+            {{ error }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% block contenido %}{% endblock %}
+
+    {% if user.is_authenticated and user.perfil_administrativo.universidad %}
+    <footer style="margin-top: 40px; padding: 20px; display: flex; justify-content: space-between; align-items: center;">
+        <h2 style="font-size: 16px; font-weight: bold; color: #5c6b73; margin: 0;"> {{ user.perfil_administrativo.universidad.nombre }}
+        </h2>
+        
+        {% if user.perfil_administrativo.universidad.identificador_visual %}
+            <img src="{{ user.perfil_administrativo.universidad.identificador_visual.url }}" alt="Logo de {{ user.perfil_administrativo.universidad.abreviatura }}" style="max-width: 100px; max-height: 50px; object-fit: contain; border-radius: 4px;">
+        {% endif %}
+    </footer>
+    {% endif %}
+</div>
+
+</body>
+</html>
