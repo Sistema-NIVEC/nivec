@@ -279,6 +279,168 @@ class CohorteDeMatricula(models.Model):
 
         return cohorte_de_matricula.calcular_total_matriculados()
 
+class MatriculaParalelo(models.Model):
+    estudiante = models.ForeignKey(
+        'usuarios.PerfilEstudiante', on_delete=models.PROTECT,
+        related_name="estudiantes_matriculados", verbose_name="Estudiante registrado"
+    )
+    paralelo = models.ForeignKey(
+        Paralelo, on_delete=models.PROTECT,
+        related_name="estudiantes_matriculados", verbose_name="Paralelo registrado"
+    )
+    cohorte_de_matricula = models.ForeignKey(
+        CohorteDeMatricula, on_delete=models.PROTECT,
+        related_name="matriculas", verbose_name="Cohorte de matrícula registrada"
+    )
+    fecha_registro = models.DateField(auto_now_add=True, verbose_name="Fecha de registro")
 
+    class Meta:
+        verbose_name = "Matrícula en paralelo"
+        verbose_name_plural = "Matrículas en paralelos"
+        unique_together = ("estudiante", "paralelo")
+
+    def __str__(self):
+        return f"{self.estudiante} ({self.paralelo})"
+
+
+# ══════════════════════════════════════════════════════════════
+# CONSOLIDADO Y EVALUACIONES
+# ══════════════════════════════════════════════════════════════
+
+class ConsolidadoAcademico(models.Model):
+    periodo_academico = models.OneToOneField(
+        PeriodoDeNivelacion, on_delete=models.PROTECT,
+        related_name="consolidado_academico", verbose_name="Periodo de nivelación registrado"
+    )
+    fecha_de_corte = models.DateField(verbose_name="Fecha de corte")
+    total_cupos_aceptados = models.IntegerField(default=0, verbose_name="Número de cupos aceptados")
+    registros_totales = models.IntegerField(default=0, verbose_name="Número de registros")
+    registros_validos = models.IntegerField(default=0, verbose_name="Número de registros válidos")
+    registros_observados = models.IntegerField(default=0, verbose_name="Número de registros observados")
+
+    class Meta:
+        verbose_name = "Consolidado académico"
+        verbose_name_plural = "Consolidados académicos"
+
+    def __str__(self):
+        return f"CONSOLIDADO ACADÉMICO ({self.periodo_academico.periodo})"
+
+
+class EvaluacionAcademica(models.Model):
+    estudiante = models.ForeignKey(
+        'usuarios.PerfilEstudiante', on_delete=models.PROTECT,
+        related_name="evaluaciones_academicas", verbose_name="Estudiante registrado"
+    )
+    unidad_curricular = models.ForeignKey(
+        UnidadCurricular, on_delete=models.PROTECT,
+        related_name="evaluaciones_academicas", verbose_name="Unidad curricular registrada"
+    )
+    calificacion_parcial_1 = models.FloatField(default=0.0, verbose_name="Calificación primer parcial")
+    calificacion_parcial_2 = models.FloatField(default=0.0, verbose_name="Calificación segundo parcial")
+    nota_final = models.FloatField(default=0.0, verbose_name="Calificación final")
+    porcentaje_asistencia = models.FloatField(default=0.0, verbose_name="Porcentaje de asistencia final")
+    estado_de_aprobacion = models.CharField(
+        max_length=50, choices=cambiar_enum_a_choices(EstadoDeAprobacion),
+        default=EstadoDeAprobacion.PENDIENTE.value, verbose_name="Estado de aprobación"
+    )
+    observacion = models.TextField(blank=True, default="", verbose_name="Observación")
+    estado_revision = models.CharField(
+        max_length=50,
+        choices=[("Borrador", "Borrador"), ("En revisión", "En revisión"), ("Formalizado", "Formalizado")],
+        default="Borrador", verbose_name="Estado de revisión"
+    )
+    periodo_de_nivelacion = models.ForeignKey(
+        'academico.PeriodoDeNivelacion', on_delete=models.PROTECT,
+        related_name="evaluaciones", verbose_name="Periodo de nivelación",
+        null=True, blank=True
+    )
+
+    class Meta:
+        verbose_name = "Evaluación académica"
+        verbose_name_plural = "Evaluaciones académicas"
+        unique_together = ("estudiante", "unidad_curricular")
+
+    def __str__(self):
+        return f"{self.estudiante} ({self.unidad_curricular.nombre})"
+
+
+# ══════════════════════════════════════════════════════════════
+# INCIDENCIAS Y DESEMPEÑO
+# ══════════════════════════════════════════════════════════════
+
+class IncidenciaAcademica(models.Model):
+    codigo_incidencia = models.CharField(max_length=50, unique=True, verbose_name="Código de incidencia")
+    docente_implicado = models.ForeignKey(
+        'usuarios.PerfilDocente', on_delete=models.PROTECT,
+        related_name="incidencias", verbose_name="Docente implicado"
+    )
+    descripcion = models.TextField(verbose_name="Descripción")
+    fecha_incidencia = models.DateField(verbose_name="Fecha de incidencia")
+    responsable_autorizacion = models.ForeignKey(
+        'usuarios.PerfilAdministrativo', on_delete=models.PROTECT,
+        related_name="incidencias_autorizadas", verbose_name="Responsable de autorización"
+    )
+
+    class Meta:
+        verbose_name = "Incidencia académica"
+        verbose_name_plural = "Incidencias académicas"
+
+    def __str__(self):
+        return f"{self.codigo_incidencia} ({self.docente_implicado})"
+
+
+class EvaluacionDeDesempeno(models.Model):
+    docente_responsable = models.ForeignKey(
+        'usuarios.PerfilDocente', on_delete=models.PROTECT,
+        related_name="evaluaciones_desempeno", verbose_name="Docente responsable"
+    )
+    periodo_de_nivelacion = models.ForeignKey(
+        PeriodoDeNivelacion, on_delete=models.PROTECT,
+        related_name="evaluaciones_desempeno", verbose_name="Periodo de nivelación registrado"
+    )
+    porcentaje_de_horas_cumplidas = models.FloatField(default=0.0, verbose_name="Porcentaje de horas cumplidas")
+    entrega_oportuna_de_calificaciones = models.BooleanField(default=False, verbose_name="Entrega oportuna de calificaciones")
+    porcentaje_de_aprobacion_paralelo = models.FloatField(default=0.0, verbose_name="Porcentaje de aprobación de paralelo")
+    resultado_de_evaluacion_estudiantil = models.FloatField(default=0.0, verbose_name="Resultado de evaluación estudiantil")
+    puntaje_final = models.FloatField(default=0.0, verbose_name="Puntaje final")
+
+    class Meta:
+        verbose_name = "Evaluación de desempeño"
+        verbose_name_plural = "Evaluaciones de desempeño"
+        unique_together = ("docente_responsable", "periodo_de_nivelacion")
+
+    def __str__(self):
+        return f"{self.docente_responsable} ({self.periodo_de_nivelacion.periodo})"
+
+
+# ══════════════════════════════════════════════════════════════
+# INFORMES
+# ══════════════════════════════════════════════════════════════
+
+class InformeGeneral(models.Model):
+    periodo_academico = models.ForeignKey(
+        PeriodoDeNivelacion, on_delete=models.PROTECT,
+        related_name="informes", verbose_name="Periodo de nivelación registrado"
+    )
+    codigo_de_informe = models.CharField(max_length=100, unique=True, verbose_name="Código de informe")
+    tipo_de_informe = models.CharField(
+        max_length=50, choices=cambiar_enum_a_choices(TipoDeInforme), verbose_name="Tipo de informe"
+    )
+    estado_de_informe = models.CharField(
+        max_length=50, choices=cambiar_enum_a_choices(EstadoDeInforme),
+        default=EstadoDeInforme.BORRADOR.value, verbose_name="Estado"
+    )
+    fecha_de_emision = models.DateField(null=True, blank=True, verbose_name="Fecha de emisión")
+    cohortes = models.ManyToManyField(
+        CohorteDeMatricula, blank=True,
+        related_name="informes", verbose_name="Cohortes de matrícula"
+    )
+
+    class Meta:
+        verbose_name = "Informe general"
+        verbose_name_plural = "Informes generales"
+
+    def __str__(self):
+        return f"{self.codigo_de_informe} ({self.estado_de_informe})"
 
     
