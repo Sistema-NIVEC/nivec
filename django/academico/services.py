@@ -654,3 +654,130 @@ def servicio_generar_paralelos(periodo_db, capacidad=35):
                 cohorte.save()
 
     return resumen
+
+def servicio_mover_estudiante(estudiante_db, paralelo_destino_db):
+    periodo = paralelo_destino_db.periodo_de_nivelacion
+    carrera = paralelo_destino_db.unidad_curricular.malla_curricular.carrera
+    nombre_destino = paralelo_destino_db.nombre
+    jornada = paralelo_destino_db.jornada
+
+    paralelos_destino = list(Paralelo.objects.filter(
+        periodo_de_nivelacion=periodo,
+        jornada=jornada,
+        nombre=nombre_destino,
+        unidad_curricular__malla_curricular__carrera=carrera,
+    ))
+    if not paralelos_destino:
+        return (False, "La especificación del Paralelo de destino no es válida")
+
+    representativo = paralelos_destino[0]
+    ocupacion_destino = MatriculaParalelo.objects.filter(
+        paralelo=representativo
+    ).exclude(estudiante=estudiante_db).count()
+    if ocupacion_destino >= representativo.capacidad_maxima:
+        return (False, "El Paralelo de destino no presenta cupos disponibles")
+
+    matriculas_actuales = MatriculaParalelo.objects.filter(
+        estudiante=estudiante_db,
+        paralelo__periodo_de_nivelacion=periodo,
+        paralelo__unidad_curricular__malla_curricular__carrera=carrera,
+    )
+
+    primera_matricula = matriculas_actuales.first()
+    if primera_matricula and primera_matricula.paralelo.nombre == nombre_destino:
+        return (False, "El Estudiante ya pertenece al Paralelo especificado")
+
+    cohorte = (
+        primera_matricula.cohorte_de_matricula
+        if primera_matricula else _obtener_o_crear_cohorte(periodo, carrera)
+    )
+
+    with transaction.atomic():
+        matriculas_actuales.delete()
+        for paralelo_db in paralelos_destino:
+            MatriculaParalelo.objects.get_or_create(
+                estudiante=estudiante_db,
+                paralelo=paralelo_db,
+                defaults={"cohorte_de_matricula": cohorte},
+            )
+
+    return (True, "El Estudiante fue reasignado correctamente")
+
+
+def _paralelos_del_grupo_de_estudiantes(paralelo_db):
+    carrera = paralelo_db.unidad_curricular.malla_curricular.carrera
+    return Paralelo.objects.filter(
+        periodo_de_nivelacion=paralelo_db.periodo_de_nivelacion,
+        jornada=paralelo_db.jornada,
+        nombre=paralelo_db.nombre,
+        unidad_curricular__malla_curricular__carrera=carrera,
+    )
+
+
+def periodo_permite_gestion_matriculas(periodo_db):
+    """Delega la consulta de estado al objeto POO PeriodoDeNivelacion."""
+    periodo_poo = _construir_periodo(periodo_db)
+    return periodo_poo.permite_gestion_matriculas()
+
+
+def servicio_retirar_estudiante_de_paralelo(estudiante_db, paralelo_db):
+    periodo = paralelo_db.periodo_de_nivelacion
+    carrera = paralelo_db.unidad_curricular.malla_curricular.carrera
+
+    if not periodo_permite_gestion_matriculas(periodo):
+        return (False, "No se ha podido administrar la matrícula")
+
+    paralelos_grupo = _paralelos_del_grupo_de_estudiantes(paralelo_db)
+    matriculas = MatriculaParalelo.objects.filter(estudiante=estudiante_db, paralelo__in=paralelos_grupo)
+    if not matriculas.exists():
+        return (False, "El Estudiante no pertenece al Paralelo especificado")
+
+    with transaction.atomic():
+        matriculas.delete()
+        estudiante_db.estado_de_matricula = EstadoDeMatricula.RETIRADO.value
+        estudiante_db.save(update_fields=["estado_de_matricula"])
+
+    servicio_recalcular_cohorte_de_carrera(periodo, carrera)
+    return (True, "El Estudiante fue retirado del Paralelo correctamente")
+
+
+def servicio_agregar_estudiante_a_paralelo(estudiante_db, paralelo_db):
+    periodo = paralelo_db.periodo_de_nivelacion
+    carrera = paralelo_db.unidad_curricular.malla_curricular.carrera
+
+    if not periodo_permite_gestion_matriculas(periodo):
+        return (False, "No se ha podido administrar la matrícula")
+
+    if (estudiante_db.periodo_de_nivelacion_id != periodo.id
+            or estudiante_db.carrera_registrada_id != carrera.id
+            or estudiante_db.jornada != paralelo_db.jornada):
+        return (False, "El Estudiante no es compatible con el Paralelo")
+
+    if estudiante_db.estado_de_matricula in (EstadoDeMatricula.RETIRADO.value, EstadoDeMatricula.ANULADO.value):
+        return (False, "El Estudiante no tiene una matrícula activa")
+
+    if MatriculaParalelo.objects.filter(estudiante=estudiante_db, paralelo__periodo_de_nivelacion=periodo).exists():
+        return (False, "El Estudiante ya se encuentra asignado a un Paralelo")
+
+    paralelos_grupo = list(_paralelos_del_grupo_de_estudiantes(paralelo_db))
+    representativo = paralelos_grupo[0]
+    ocupacion = MatriculaParalelo.objects.filter(paralelo=representativo).count()
+    if ocupacion >= representativo.capacidad_maxima:
+        return (False, "El Paralelo no presenta cupos disponibles")
+
+    cohorte = _obtener_o_crear_cohorte(periodo, carrera)
+    with transaction.atomic():
+        ya_matriculado = set(
+            MatriculaParalelo.objects.filter(
+                estudiante=estudiante_db, paralelo__in=paralelos_grupo
+            ).values_list("paralelo_id", flat=True)
+        )
+        nuevas = [
+            MatriculaParalelo(estudiante=estudiante_db, paralelo=p, cohorte_de_matricula=cohorte)
+            for p in paralelos_grupo if p.id not in ya_matriculado
+        ]
+        if nuevas:
+            MatriculaParalelo.objects.bulk_create(nuevas)
+
+    servicio_recalcular_cohorte_de_carrera(periodo, carrera)
+    return (True, "El Estudiante fue agregado al Paralelo correctamente")
